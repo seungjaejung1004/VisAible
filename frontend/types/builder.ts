@@ -21,6 +21,8 @@ export type DatasetItem = {
 };
 
 export type WorkspaceMode = 'builder' | 'tutorial' | 'competition' | 'playground' | 'learning';
+export type PlaygroundMode = 'stock' | 'rps';
+
 
 export type BlockType = 'linear' | 'cnn' | 'pooling' | 'dropout';
 

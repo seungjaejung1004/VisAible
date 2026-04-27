@@ -13,6 +13,7 @@ import { LearningWorkspace as LearningWorkspacePanel } from '@/features/model-bu
 import { MinaBubbleChat, type MinaMessage } from '@/features/model-builder/components/mina-bubble-chat';
 import { MnistElevatorMission } from '@/features/model-builder/components/mnist-elevator-mission';
 import { ModelPreviewModal } from '@/features/model-builder/components/model-preview-modal';
+import { RockPaperScissorsPlayground } from '@/features/model-builder/components/rock-paper-scissors-playground';
 import { Sidebar } from '@/features/model-builder/components/sidebar';
 import { StockPlayground } from '@/features/model-builder/components/stock-playground';
 import { TopBar } from '@/features/model-builder/components/top-bar';
@@ -58,6 +59,7 @@ import type {
   TrainingRunResult,
   StockPreset,
   WorkspaceMode,
+  PlaygroundMode,
 } from '@/types/builder';
 
 const competitionDataset = {
@@ -439,6 +441,7 @@ export function BuilderShell() {
   const [selectedDatasetId, setSelectedDatasetId] = useState(datasets[0]?.id ?? 'mnist');
   const [selectedStock, setSelectedStock] = useState<StockPreset | null>(stockPlaygroundPresets[0] ?? null);
   const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceMode>('builder');
+  const [playgroundMode, setPlaygroundMode] = useState<PlaygroundMode>('stock');
   const [optimizer, setOptimizer] = useState<OptimizerName>('AdamW');
   const [learningRate, setLearningRate] = useState(optimizerConfigs.AdamW.defaultLearningRate);
   const [epochs, setEpochs] = useState('10');
@@ -2305,6 +2308,7 @@ export function BuilderShell() {
               minaHighlightBlockType={activeWorkspace === 'builder' ? minaLibraryHighlightBlockType : null}
               selectedTutorialLessonId={selectedTutorialLessonId}
               selectedStock={selectedStock}
+              playgroundMode={playgroundMode}
               onDatasetSelect={(datasetId) => {
                 if (activeWorkspace === 'competition') {
                   return;
@@ -2337,13 +2341,18 @@ export function BuilderShell() {
                 );
               }}
               onStockSelect={setSelectedStock}
+              onPlaygroundModeSelect={setPlaygroundMode}
               onBlockDragStart={setDraggingBlock}
               onBlockDragEnd={() => setDraggingBlock(null)}
             />
           )}
           {activeWorkspace === 'playground' ? (
             <div className="min-w-0">
-              <StockPlayground selectedStock={selectedStock ?? stockPlaygroundPresets[0]} />
+              {playgroundMode === 'stock' ? (
+                <StockPlayground selectedStock={selectedStock ?? stockPlaygroundPresets[0]} />
+              ) : (
+                <RockPaperScissorsPlayground />
+              )}
             </div>
           ) : activeWorkspace === 'learning' ? (
             <div className="min-w-0 lg:col-span-2">

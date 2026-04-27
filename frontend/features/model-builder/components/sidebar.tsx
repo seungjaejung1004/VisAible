@@ -7,7 +7,7 @@ import { Icon } from '@/features/model-builder/components/icons';
 import { searchStocks } from '@/lib/api/stocks';
 import { datasets, libraryBlocks } from '@/lib/constants/builder-data';
 import { stockPlaygroundPresets } from '@/lib/constants/stock-playground';
-import type { BlockAccent, BlockType, DatasetItem, StockPreset, WorkspaceMode } from '@/types/builder';
+import type { BlockAccent, BlockType, DatasetItem, StockPreset, WorkspaceMode, PlaygroundMode } from '@/types/builder';
 
 type SidebarProps = {
   selectedDatasetId: string;
@@ -18,9 +18,11 @@ type SidebarProps = {
   minaHighlightBlockType?: BlockType | null;
   selectedTutorialLessonId?: string | null;
   selectedStock?: StockPreset | null;
+  playgroundMode?: PlaygroundMode;
   onDatasetSelect: (datasetId: string) => void;
   onTutorialLessonSelect?: (lessonId: string) => void;
   onStockSelect?: (stock: StockPreset) => void;
+  onPlaygroundModeSelect?: (mode: PlaygroundMode) => void;
   onBlockDragStart: (type: BlockType) => void;
   onBlockDragEnd: () => void;
 };
@@ -154,9 +156,11 @@ export function Sidebar({
   minaHighlightBlockType = null,
   selectedTutorialLessonId = null,
   selectedStock,
+  playgroundMode = 'stock',
   onDatasetSelect,
   onTutorialLessonSelect,
   onStockSelect,
+  onPlaygroundModeSelect,
   onBlockDragStart,
   onBlockDragEnd,
 }: SidebarProps) {
@@ -239,88 +243,88 @@ export function Sidebar({
   }, [activeWorkspace, stockSearchQuery]);
 
   return (
-    <aside className="relative z-10 min-w-0 overflow-hidden ui-surface flex h-full flex-col gap-4 px-5 py-5">
+    <aside className="ui-surface relative z-10 flex h-full min-w-0 flex-col gap-4 overflow-hidden px-5 py-5">
       {activeWorkspace === 'builder' ? (
         <section className="grid gap-2.5">
-            <h2 className="ui-section-title">
-              Dataset Selection
-            </h2>
-            <div className="relative grid gap-2">
-              {datasets.map((dataset) => (
-                <button
-                  key={dataset.id}
-                  type="button"
-                  onClick={() => onDatasetSelect(dataset.id)}
-                  onMouseEnter={() => setHoveredDatasetId(dataset.id)}
-                  onMouseLeave={() => setHoveredDatasetId((current) => (current === dataset.id ? null : current))}
-                  className={[
-                    'flex items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left text-[13px] font-semibold transition-colors',
-                    dataset.id === selectedDatasetId
-                      ? 'border-primary/25 bg-primary/10 text-primary shadow-[0_8px_20px_rgba(17,81,255,0.08)]'
-                      : 'border-transparent text-[#4b5b77] hover:border-[#d9e2ef] hover:bg-white/80',
-                  ].join(' ')}
-                >
-                  <Icon name={dataset.icon} />
-                  <span>{dataset.label}</span>
-                </button>
-              ))}
+          <h2 className="ui-section-title">Dataset Selection</h2>
+          <div className="relative grid gap-2">
+            {datasets.map((dataset) => (
+              <button
+                key={dataset.id}
+                type="button"
+                onClick={() => onDatasetSelect(dataset.id)}
+                onMouseEnter={() => setHoveredDatasetId(dataset.id)}
+                onMouseLeave={() => setHoveredDatasetId((current) => (current === dataset.id ? null : current))}
+                className={[
+                  'flex items-center gap-3 rounded-[18px] border px-3.5 py-3 text-left text-[13px] font-semibold transition-colors',
+                  dataset.id === selectedDatasetId
+                    ? 'border-primary/25 bg-primary/10 text-primary shadow-[0_8px_20px_rgba(17,81,255,0.08)]'
+                    : 'border-transparent text-[#4b5b77] hover:border-[#d9e2ef] hover:bg-white/80',
+                ].join(' ')}
+              >
+                <Icon name={dataset.icon} />
+                <span>{dataset.label}</span>
+              </button>
+            ))}
 
-              {hoveredDataset ? (
-                <FloatingInfoPanel interactive={false}>
-                  <DatasetDetailPanel
-                    dataset={hoveredDataset}
-                    widthClassName="w-[min(680px,calc(100vw-360px))]"
-                    largeSamples
-                  />
-                </FloatingInfoPanel>
-              ) : null}
-            </div>
-          </section>
+            {hoveredDataset ? (
+              <FloatingInfoPanel interactive={false}>
+                <DatasetDetailPanel
+                  dataset={hoveredDataset}
+                  widthClassName="w-[min(680px,calc(100vw-360px))]"
+                  largeSamples
+                />
+              </FloatingInfoPanel>
+            ) : null}
+          </div>
+        </section>
       ) : null}
 
       {activeWorkspace === 'tutorial' ? (
         <section className="grid gap-2.5">
-          <h2 className="ui-section-title">
-            Class Selection
-          </h2>
+          <h2 className="ui-section-title">Class Selection</h2>
           <div className="relative grid gap-2">
-            {tutorialLessons.map((lesson) => {
-              return (
-                <button
-                  key={lesson.id}
-                  type="button"
-                  onClick={() => {
-                    onDatasetSelect(lesson.datasetId);
-                    setOpenedTutorialLessonId(lesson.id);
-                    onTutorialLessonSelect?.(lesson.id);
-                  }}
-                  className={[
-                    'flex items-start gap-3 rounded-[18px] border px-3.5 py-3 text-left transition-colors',
-                    (selectedTutorialLessonId ?? openedTutorialLessonId) === lesson.id
-                      ? 'border-primary/25 bg-primary/10 text-primary shadow-[0_8px_20px_rgba(17,81,255,0.08)]'
-                      : 'border-transparent text-[#4b5b77] hover:border-[#d9e2ef] hover:bg-white/80',
-                  ].join(' ')}
-                >
-                  <span
-                    className={[
-                      'grid h-8 w-8 place-items-center rounded-[12px]',
-                      lesson.paletteClass,
-                    ].join(' ')}
-                  >
-                    <Icon name={lesson.icon} />
+            {tutorialLessons.map((lesson) => (
+              <button
+                key={lesson.id}
+                type="button"
+                onClick={() => {
+                  onDatasetSelect(lesson.datasetId);
+                  setOpenedTutorialLessonId(lesson.id);
+                  onTutorialLessonSelect?.(lesson.id);
+                }}
+                className={[
+                  'group flex flex-col gap-1 rounded-[18px] border px-3.5 py-3.5 text-left transition-all',
+                  openedTutorialLessonId === lesson.id
+                    ? 'border-primary/25 bg-primary/10 shadow-[0_8px_20px_rgba(17,81,255,0.08)]'
+                    : 'border-transparent hover:border-[#d9e2ef] hover:bg-white/80',
+                ].join(' ')}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#71839d]">
+                    {lesson.code}
                   </span>
-                  <span className="min-w-0 flex-1">
-                    <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#7c8ca5]">
-                      {lesson.code}
+                  {openedTutorialLessonId === lesson.id && (
+                    <div className="rounded-full bg-primary/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.1em] text-primary">
+                      Active
                     </div>
-                    <div className="mt-1 text-[13px] font-bold leading-5 text-[#10213b]">
-                      {lesson.title}
-                    </div>
-                  </span>
-                </button>
-              );
-            })}
+                  )}
+                </div>
+                <div className="font-display text-[15px] font-bold text-[#10213b]">
+                  {lesson.title}
+                </div>
+              </button>
+            ))}
 
+            {activeTutorialLesson && activeTutorialDataset && (
+              <FloatingInfoPanel interactive>
+                <TutorialLessonPanel
+                  lesson={activeTutorialLesson}
+                  dataset={activeTutorialDataset}
+                  onClose={() => setOpenedTutorialLessonId(null)}
+                />
+              </FloatingInfoPanel>
+            )}
           </div>
         </section>
       ) : null}
@@ -363,88 +367,141 @@ export function Sidebar({
       ) : null}
 
       {activeWorkspace === 'playground' ? (
-        <section className="grid gap-3">
-          <h2 className="ui-section-title">Stock Prediction</h2>
-          <label className="rounded-[20px] border border-[#d9e2ef] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(13,27,51,0.04)]">
-            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#70819a]">
-              Search Ticker
-            </div>
-            <input
-              value={stockSearchQuery}
-              onChange={(event) => setStockSearchQuery(event.target.value)}
-              placeholder="AAPL, Tesla, AMD..."
-              className="mt-2 w-full border-none bg-transparent font-display text-[18px] font-bold text-[#10213b] outline-none placeholder:font-semibold placeholder:text-[#9badc3]"
-            />
-            <div className="mt-2 text-[11px] font-semibold text-[#7386a3]">
-              {stockSearchBusy ? '검색 중...' : '티커 또는 회사명으로 검색해서 바로 학습할 수 있습니다.'}
-            </div>
-          </label>
-          <div className="grid gap-2 min-w-0">
-            {stockSearchResults.map((preset) => {
-              const active = preset.ticker === selectedStockPreset?.ticker;
-              return (
-                <button
-                  key={preset.ticker}
-                  type="button"
-                  onClick={() => onStockSelect?.(preset)}
-                  className={[
-                    'min-w-0 overflow-hidden rounded-[18px] border px-3.5 py-3 text-left transition-colors',
-                    active
-                      ? 'border-primary/25 bg-primary/10 shadow-[0_8px_20px_rgba(17,81,255,0.08)]'
-                      : 'border-transparent hover:border-[#d9e2ef] hover:bg-white/80',
-                  ].join(' ')}
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] bg-[#edf3ff] text-primary">
-                      <Icon name="chip" className="h-4.5 w-4.5" />
-                    </span>
-                    <span className="min-w-0 flex-1 overflow-hidden">
-                      <div className="flex min-w-0 items-center justify-between gap-2">
-                        <span className="min-w-0 truncate font-display text-[15px] font-bold text-[#10213b]">
-                          {preset.label}
-                        </span>
-                        <span className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-extrabold tracking-[0.12em] text-[#6280aa]">
-                          {preset.ticker}
-                        </span>
-                      </div>
-                      <div className="mt-1 truncate text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#6a7f9d]">
-                        {preset.sector}
-                      </div>
-                      <div className="mt-2 overflow-hidden break-words text-[12px] leading-5 text-[#5b6c84]">
-                        {preset.description}
-                      </div>
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-            {!stockSearchResults.length && !stockSearchBusy ? (
-              <div className="rounded-[18px] border border-dashed border-[#d9e2ef] px-4 py-4 text-[12px] leading-5 text-[#6b809d]">
-                검색 결과가 없습니다. 티커 기호를 정확히 입력해 보세요.
-              </div>
-            ) : null}
+        <section className="grid gap-4">
+          <div className="flex gap-1.5 rounded-[20px] bg-[#f0f4f9] p-1.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
+            <button
+              type="button"
+              onClick={() => onPlaygroundModeSelect?.('stock')}
+              className={[
+                'flex-1 rounded-[16px] px-3 py-2.5 text-[12px] font-bold transition-all',
+                playgroundMode === 'stock'
+                  ? 'bg-white text-primary shadow-[0_4px_12px_rgba(17,81,255,0.08)]'
+                  : 'text-[#6e7f99] hover:text-[#244ea8]',
+              ].join(' ')}
+            >
+              주식 예측하기
+            </button>
+            <button
+              type="button"
+              onClick={() => onPlaygroundModeSelect?.('rps')}
+              className={[
+                'flex-1 rounded-[16px] px-3 py-2.5 text-[12px] font-bold transition-all',
+                playgroundMode === 'rps'
+                  ? 'bg-white text-primary shadow-[0_4px_12px_rgba(17,81,255,0.08)]'
+                  : 'text-[#6e7f99] hover:text-[#244ea8]',
+              ].join(' ')}
+            >
+              AI랑 가위바위보
+            </button>
           </div>
 
-          {selectedStockPreset ? (
-            <div className="rounded-[22px] border border-[#d9e2ef] bg-[linear-gradient(180deg,#ffffff,#f8fbff)] px-4 py-4 shadow-[0_10px_24px_rgba(13,27,51,0.04)]">
-              <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#70819a]">
-                Selected Ticker
+          {playgroundMode === 'stock' ? (
+            <div className="grid gap-3">
+              <h2 className="ui-section-title">Stock Prediction</h2>
+              <label className="rounded-[20px] border border-[#d9e2ef] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(13,27,51,0.04)]">
+                <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#70819a]">
+                  Search Ticker
+                </div>
+                <input
+                  value={stockSearchQuery}
+                  onChange={(event) => setStockSearchQuery(event.target.value)}
+                  placeholder="AAPL, Tesla, AMD..."
+                  className="mt-2 w-full border-none bg-transparent font-display text-[18px] font-bold text-[#10213b] outline-none placeholder:font-semibold placeholder:text-[#9badc3]"
+                />
+                <div className="mt-2 text-[11px] font-semibold text-[#7386a3]">
+                  {stockSearchBusy ? '검색 중...' : '티커 또는 회사명으로 검색해서 바로 학습할 수 있습니다.'}
+                </div>
+              </label>
+              <div className="grid gap-2 min-w-0">
+                {stockSearchResults.map((preset) => {
+                  const active = preset.ticker === selectedStockPreset?.ticker;
+                  return (
+                    <button
+                      key={preset.ticker}
+                      type="button"
+                      onClick={() => onStockSelect?.(preset)}
+                      className={[
+                        'min-w-0 overflow-hidden rounded-[18px] border px-3.5 py-3 text-left transition-colors',
+                        active
+                          ? 'border-primary/25 bg-primary/10 shadow-[0_8px_20px_rgba(17,81,255,0.08)]'
+                          : 'border-transparent hover:border-[#d9e2ef] hover:bg-white/80',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[14px] bg-[#edf3ff] text-primary">
+                          <Icon name="chip" className="h-4.5 w-4.5" />
+                        </span>
+                        <span className="min-w-0 flex-1 overflow-hidden">
+                          <div className="flex min-w-0 items-center justify-between gap-2">
+                            <span className="min-w-0 truncate font-display text-[15px] font-bold text-[#10213b]">
+                              {preset.label}
+                            </span>
+                            <span className="shrink-0 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-extrabold tracking-[0.12em] text-[#6280aa]">
+                              {preset.ticker}
+                            </span>
+                          </div>
+                          <div className="mt-1 truncate text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#6a7f9d]">
+                            {preset.sector}
+                          </div>
+                          <div className="mt-2 overflow-hidden break-words text-[12px] leading-5 text-[#5b6c84]">
+                            {preset.description}
+                          </div>
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+                {!stockSearchResults.length && !stockSearchBusy && (
+                  <div className="rounded-[18px] border border-dashed border-[#d9e2ef] px-4 py-4 text-[12px] leading-5 text-[#6b809d]">
+                    검색 결과가 없습니다. 티커 기호를 정확히 입력해 보세요.
+                  </div>
+                )}
               </div>
-              <div className="mt-2 font-display text-[20px] font-bold text-[#10213b]">
-                {selectedStockPreset.ticker}
-              </div>
-              <div className="mt-1 break-words text-[13px] font-semibold text-[#4d607d]">
-                {selectedStockPreset.label}
-              </div>
-              <div className="mt-3 break-words rounded-[16px] bg-[#f5f8ff] px-3.5 py-3 text-[12px] leading-5 text-[#5b6c84]">
-                {selectedStockPreset.description}
+
+              {selectedStockPreset && (
+                <div className="rounded-[22px] border border-[#d9e2ef] bg-[linear-gradient(180deg,#ffffff,#f8fbff)] px-4 py-4 shadow-[0_10px_24px_rgba(13,27,51,0.04)]">
+                  <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#70819a]">
+                    Selected Ticker
+                  </div>
+                  <div className="mt-2 font-display text-[20px] font-bold text-[#10213b]">
+                    {selectedStockPreset.ticker}
+                  </div>
+                  <div className="mt-1 break-words text-[13px] font-semibold text-[#4d607d]">
+                    {selectedStockPreset.label}
+                  </div>
+                  <div className="mt-3 break-words rounded-[16px] bg-[#f5f8ff] px-3.5 py-3 text-[12px] leading-5 text-[#5b6c84]">
+                    {selectedStockPreset.description}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              <h2 className="ui-section-title">Rock Paper Scissors</h2>
+              <div className="rounded-[22px] border border-primary/20 bg-primary/5 px-4 py-5 shadow-[0_12px_28px_rgba(17,81,255,0.06)]">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-[14px] bg-primary/10 text-primary">
+                    <Icon name="rocket" className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary/80">
+                      Feature Active
+                    </div>
+                    <div className="mt-0.5 text-[15px] font-bold text-[#10213b]">
+                      실시간 가위바위보
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 text-[13px] leading-6 text-[#5b6c84]">
+                  MediaPipe AI를 활용하여 실시간으로 손 모양을 인식합니다. 카운트다운에 맞춰 승부를 겨뤄보세요!
+                </div>
               </div>
             </div>
-          ) : null}
+          )}
         </section>
       ) : null}
 
-      {activeWorkspace !== 'playground' ? (
+      {activeWorkspace !== 'playground' && (
         <section className="sticky top-4 grid w-full content-start gap-2 self-stretch">
           <h2 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#7f8ea6]">
             Block Library
@@ -525,11 +582,11 @@ export function Sidebar({
             ))}
           </div>
         </section>
-      ) : null}
+      )}
 
-      {activeGuideBlock ? (
+      {activeGuideBlock && (
         <LayerGuideModal block={activeGuideBlock} onClose={() => setActiveGuideBlockId(null)} />
-      ) : null}
+      )}
     </aside>
   );
 }
