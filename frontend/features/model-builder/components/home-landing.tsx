@@ -14,7 +14,8 @@ const showcaseCards = [
     subtitle: '블록을 쌓고 결과를 바로 시각화합니다',
     description:
       'Linear, CNN, Pooling, Dropout 블록을 직접 쌓고, 학습 지표, 결정 경계, 모델 흐름까지 한 화면에서 같이 확인할 수 있습니다.',
-    imageSrc: '/showcase/lab-builder.png',
+    videoSrc: '/showcase/videos/1.mov',
+    videoPosition: 'object-top',
     workspace: 'builder' as const,
     action: 'Lab 열기',
   },
@@ -23,7 +24,8 @@ const showcaseCards = [
     subtitle: '이론을 읽다가 바로 Mina에게 묻습니다',
     description:
       'DNN, CNN 같은 핵심 이론을 PDF로 읽고, 궁금한 부분은 캡처해서 바로 Mina에게 질문하며 학습을 이어갑니다.',
-    imageSrc: '/showcase/docs-cnn-chat.png',
+    videoSrc: '/showcase/videos/2.mp4',
+    videoPosition: 'object-[center_68%]',
     workspace: 'learning' as const,
     action: 'Docs 보기',
   },
@@ -32,7 +34,8 @@ const showcaseCards = [
     subtitle: 'AI가 실제로 뭘 할 수 있는지 먼저 체험합니다',
     description:
       '주식 예측처럼 결과가 바로 보이는 인터랙션으로, 공부 전에 먼저 AI의 출력과 반응을 경험하게 합니다.',
-    imageSrc: '/showcase/stock-playground.png',
+    videoSrc: '/showcase/videos/3.mov',
+    videoPosition: 'object-top',
     workspace: 'playground' as const,
     action: 'Playground 열기',
   },
@@ -41,7 +44,8 @@ const showcaseCards = [
     subtitle: '카메라로 CNN 인식을 바로 체험합니다',
     description:
       '실시간 손 모양 인식 미니 게임으로, CNN이 단순한 이론이 아니라 바로 반응하는 기술이라는 걸 느끼게 합니다.',
-    imageSrc: '/showcase/rps-playground.png',
+    videoSrc: '/showcase/videos/4.mov',
+    videoPosition: 'object-[center_72%]',
     workspace: 'playground' as const,
     action: '미니 게임 열기',
   },
@@ -264,12 +268,15 @@ export function HomeLanding({ onNavigate }: HomeLandingProps) {
               className="overflow-hidden rounded-[24px] border border-[#dbe5f1] bg-white px-4 py-4 shadow-[0_18px_36px_rgba(15,23,42,0.05)]"
             >
               <div className="overflow-hidden rounded-[18px] border border-[#e4ebf6] bg-[#f8fbff]">
-                <Image
-                  src={card.imageSrc}
-                  alt={`${card.title} screenshot`}
-                  width={1200}
-                  height={760}
-                  className="h-[240px] w-full object-cover object-top"
+                <video
+                  src={card.videoSrc}
+                  className={`h-[240px] w-full object-cover ${card.videoPosition}`}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  aria-label={`${card.title} preview video`}
                 />
               </div>
               <div className="mt-4">
