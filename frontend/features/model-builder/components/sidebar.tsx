@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/features/model-builder/components/icons';
+import { searchStocks } from '@/lib/api/stocks';
 import { datasets, libraryBlocks } from '@/lib/constants/builder-data';
 import { stockPlaygroundPresets } from '@/lib/constants/stock-playground';
 import type { BlockAccent, BlockType, DatasetItem, StockPreset, WorkspaceMode, PlaygroundMode } from '@/types/builder';
@@ -170,6 +171,10 @@ export function Sidebar({
   const [openedTutorialLessonId, setOpenedTutorialLessonId] = useState<string | null>(
     selectedTutorialLessonId,
   );
+  const [stockSearchQuery, setStockSearchQuery] = useState('');
+  const [stockSearchResults, setStockSearchResults] = useState<StockPreset[]>(stockPlaygroundPresets);
+  const [isStockSearchLoading, setIsStockSearchLoading] = useState(false);
+  const [stockSearchError, setStockSearchError] = useState<string | null>(null);
   const hoveredDataset =
     datasets.find((dataset) => dataset.id === hoveredDatasetId) ?? null;
   const activeTutorialLesson =
@@ -194,6 +199,51 @@ export function Sidebar({
   useEffect(() => {
     setOpenedTutorialLessonId(selectedTutorialLessonId);
   }, [selectedTutorialLessonId]);
+
+  useEffect(() => {
+    if (activeWorkspace !== 'playground' || playgroundMode !== 'stock') {
+      return;
+    }
+
+    const normalizedQuery = stockSearchQuery.trim();
+    if (!normalizedQuery) {
+      setStockSearchResults(stockPlaygroundPresets);
+      setIsStockSearchLoading(false);
+      setStockSearchError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsStockSearchLoading(true);
+    setStockSearchError(null);
+
+    const timeoutId = window.setTimeout(() => {
+      void searchStocks(normalizedQuery)
+        .then((results) => {
+          if (cancelled) {
+            return;
+          }
+          setStockSearchResults(results);
+        })
+        .catch(() => {
+          if (cancelled) {
+            return;
+          }
+          setStockSearchResults([]);
+          setStockSearchError('검색 결과를 불러오지 못했습니다.');
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsStockSearchLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [activeWorkspace, playgroundMode, stockSearchQuery]);
 
   return (
     <aside
@@ -344,8 +394,44 @@ export function Sidebar({
           {playgroundMode === 'stock' ? (
             <div className="grid gap-3">
               <h2 className="ui-section-title">Stock Prediction</h2>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-[10px] bg-[#edf3ff] text-primary">
+                  <Icon name="zoomIn" className="h-3.5 w-3.5" />
+                </span>
+                <input
+                  value={stockSearchQuery}
+                  onChange={(event) => setStockSearchQuery(event.target.value)}
+                  placeholder="종목명 또는 티커 검색"
+                  className="h-12 w-full rounded-[16px] border border-[#dbe5f2] bg-white/85 pl-12 pr-11 text-[13px] font-bold text-[#10213b] outline-none transition-colors placeholder:text-[#91a0b7] focus:border-primary/45 focus:bg-white"
+                />
+                {stockSearchQuery ? (
+                  <button
+                    type="button"
+                    aria-label="검색어 지우기"
+                    onClick={() => setStockSearchQuery('')}
+                    className="absolute right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-[10px] text-[#7c8faa] transition-colors hover:bg-[#eef3f9] hover:text-[#244ea8]"
+                  >
+                    <Icon name="close" className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </div>
               <div className="grid gap-2 min-w-0">
-                {stockPlaygroundPresets.map((preset) => {
+                {stockSearchError ? (
+                  <div className="rounded-[16px] border border-[#ffd7d7] bg-[#fff5f5] px-3.5 py-3 text-[12px] font-bold text-[#b43b5c]">
+                    {stockSearchError}
+                  </div>
+                ) : null}
+                {isStockSearchLoading ? (
+                  <div className="rounded-[16px] border border-[#d9e2ef] bg-white/70 px-3.5 py-3 text-[12px] font-bold text-[#6a7f9d]">
+                    검색 중...
+                  </div>
+                ) : null}
+                {!isStockSearchLoading && stockSearchResults.length === 0 ? (
+                  <div className="rounded-[16px] border border-[#d9e2ef] bg-white/70 px-3.5 py-3 text-[12px] font-bold text-[#6a7f9d]">
+                    검색 결과가 없습니다.
+                  </div>
+                ) : null}
+                {stockSearchResults.map((preset) => {
                   const active = preset.ticker === selectedStockPreset?.ticker;
                   return (
                     <button
