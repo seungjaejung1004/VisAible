@@ -10,44 +10,65 @@ from app.services.mina import (
     _GEMINI_API_URL,
     _extract_candidate_text,
     _extract_json_block,
+    _extract_gateway_text,
+    _gateway_api_key,
+    _gateway_base_url,
+    _gateway_error_detail,
+    _gateway_model,
     _gemini_api_key,
     _gemini_model,
 )
 
 
 LEARNING_CHAPTERS: dict[str, dict[str, str]] = {
+    "ai-dataset": {
+        "title": "Ai Basic",
+        "summary": "데이터셋의 역할, 구성 요소, train/validation/test 분리와 품질 기준을 살펴봅니다.",
+        "sourceLabel": "AI Dataset Chapter (PDF)",
+        "sourceUrl": "/learning-pdfs/ai-dataset-chapter.pdf",
+        "chapterLabel": "Dataset",
+    },
     "dnn-basics": {
-        "title": "DNN Basics",
-        "summary": "실제 CS229 메인 노트를 그대로 읽으며 supervised learning과 기본 모델링 관점을 훑어봅니다.",
-        "sourceLabel": "CS229 Main Notes (PDF)",
-        "sourceUrl": "https://cs229.stanford.edu/main_notes.pdf",
+        "title": "DNN Chapter",
+        "summary": "DNN의 기본 개념, 층 구조, 표현 학습 흐름을 직접 읽으며 질문할 수 있습니다.",
+        "sourceLabel": "DNN Chapter (PDF)",
+        "sourceUrl": "/learning-pdfs/dnn-chapter.pdf",
         "chapterLabel": "DNN",
     },
-    "backprop-regularization": {
-        "title": "Backprop and Regularization",
-        "summary": "실제 CS231n 강의 슬라이드로 backpropagation과 multi-layer perceptron 흐름을 읽습니다.",
-        "sourceLabel": "CS231n Lecture 4 (PDF)",
-        "sourceUrl": "https://cs231n.stanford.edu/slides/2024/lecture_4.pdf",
-        "chapterLabel": "Training",
-    },
-    "optimization": {
-        "title": "Optimization and Hyperparameters",
-        "summary": "실제 CS231n optimization 슬라이드로 SGD, momentum, learning rate schedule을 직접 읽습니다.",
-        "sourceLabel": "CS231n Lecture 3 (PDF)",
-        "sourceUrl": "https://cs231n.stanford.edu/slides/2024/lecture_3.pdf",
-        "chapterLabel": "Optimization",
-    },
-    "cnn-architectures": {
-        "title": "CNN Architectures",
-        "summary": "실제 CS231n CNN 슬라이드로 convolution, pooling, spatial hierarchy를 읽습니다.",
-        "sourceLabel": "CS231n Lecture 6 (PDF)",
-        "sourceUrl": "https://cs231n.stanford.edu/slides/2024/lecture_6_part_1.pdf",
+    "cnn-basics": {
+        "title": "CNN Chapter",
+        "summary": "CNN의 핵심 개념, convolution, feature map, pooling 흐름을 직접 읽으며 질문할 수 있습니다.",
+        "sourceLabel": "CNN Chapter (PDF)",
+        "sourceUrl": "/learning-pdfs/cnn-chapter.pdf",
         "chapterLabel": "CNN",
     },
 }
 
 
 LEARNING_SECTIONS: dict[str, list[dict[str, list[str] | str]]] = {
+    "ai-dataset": [
+        {
+            "heading": "데이터셋은 모델의 경험입니다",
+            "paragraphs": [
+                "모델은 데이터셋에 들어 있는 샘플을 통해 패턴을 배웁니다. 그래서 어떤 샘플이 포함되는지, 클래스가 얼마나 균형 잡혀 있는지, 라벨이 정확한지가 성능에 직접 영향을 줍니다.",
+                "Learning 탭에서는 PDF의 표, 예시 그림, 설명 문장을 캡처해서 데이터셋 품질이나 분할 방식이 왜 중요한지 바로 질문할 수 있습니다.",
+            ],
+        },
+        {
+            "heading": "train / validation / test 분리는 목적이 다릅니다",
+            "paragraphs": [
+                "train은 파라미터를 학습하는 용도이고, validation은 설정을 비교하는 용도이며, test는 최종 일반화 성능을 확인하는 용도입니다.",
+                "이 셋이 섞이면 모델이 실제보다 더 잘하는 것처럼 보일 수 있으므로, PDF에서 관련 설명을 볼 때도 누가 어떤 역할인지 구분해서 읽는 것이 중요합니다.",
+            ],
+        },
+        {
+            "heading": "좋은 데이터는 양보다 구조가 중요합니다",
+            "paragraphs": [
+                "샘플 수가 많아도 중복이 심하거나 편향이 크면 학습이 왜곡될 수 있습니다. 반대로 적절한 클래스 구성과 깨끗한 라벨을 갖춘 데이터는 훨씬 안정적인 학습을 만듭니다.",
+                "Builder에서 결과가 이상할 때는 모델 구조만 보지 말고 데이터셋의 대표성과 라벨 품질도 함께 의심해야 합니다.",
+            ],
+        },
+    ],
     "dnn-basics": [
         {
             "heading": "Supervised learning의 기본 루프",
@@ -71,72 +92,26 @@ LEARNING_SECTIONS: dict[str, list[dict[str, list[str] | str]]] = {
             ],
         },
     ],
-    "backprop-regularization": [
+    "cnn-basics": [
         {
-            "heading": "Backpropagation은 책임을 나눠 계산합니다",
+            "heading": "CNN은 공간 구조를 읽습니다",
             "paragraphs": [
-                "출력의 오차가 각 레이어의 파라미터에 얼마나 책임이 있는지 chain rule로 뒤에서 앞으로 전달합니다.",
-                "Builder에서 레이어를 깊게 쌓을수록 이 신호가 여러 단계를 거쳐 전달되므로 activation, 초기화, learning rate의 영향이 더 커집니다.",
+                "CNN은 작은 필터를 이미지 전체에 반복 적용하면서 edge, texture, shape 같은 지역 패턴을 찾아냅니다.",
+                "같은 가중치를 위치별로 공유하기 때문에, 완전연결층만 쓰는 구조보다 이미지 분류에 더 자연스럽게 맞습니다.",
             ],
         },
         {
-            "heading": "Regularization은 외우기를 줄입니다",
+            "heading": "Feature map은 중간 표현입니다",
             "paragraphs": [
-                "Dropout, weight decay, data augmentation은 모델이 훈련 샘플을 그대로 외우는 대신 더 일반적인 패턴을 찾도록 압력을 줍니다.",
-                "훈련 정확도는 높지만 검증 정확도가 낮을 때 regularization을 먼저 의심해볼 수 있습니다.",
+                "각 convolution 결과는 입력 이미지에서 어떤 패턴이 어디서 강하게 반응했는지 보여주는 feature map이 됩니다.",
+                "층이 깊어질수록 단순 선분보다 더 복잡한 조합을 인식하게 되고, 그 정보가 뒤쪽 분류기로 전달됩니다.",
             ],
         },
         {
-            "heading": "Gradient 흐름을 관찰합니다",
+            "heading": "Pooling은 정보를 압축합니다",
             "paragraphs": [
-                "학습이 멈춘 것처럼 보이면 loss, learning rate, activation 조합을 함께 확인해야 합니다.",
-                "너무 큰 업데이트는 튀고, 너무 작은 업데이트는 거의 움직이지 않습니다. 그래서 optimization 챕터와 자연스럽게 이어집니다.",
-            ],
-        },
-    ],
-    "optimization": [
-        {
-            "heading": "Optimizer는 파라미터를 움직이는 규칙입니다",
-            "paragraphs": [
-                "SGD, Momentum, Adam 계열은 gradient를 어떻게 해석하고 다음 위치로 이동할지 정합니다.",
-                "같은 모델이라도 optimizer가 달라지면 loss curve의 흔들림, 수렴 속도, 최종 성능이 달라질 수 있습니다.",
-            ],
-        },
-        {
-            "heading": "Learning rate는 가장 민감한 손잡이입니다",
-            "paragraphs": [
-                "Learning rate가 크면 빠르게 움직이지만 좋은 지점을 지나칠 수 있고, 작으면 안정적이지만 너무 오래 걸립니다.",
-                "VisAible에서는 learning rate를 바꾼 뒤 loss curve가 매끄럽게 내려가는지, 발산하거나 멈추는지를 먼저 비교하면 좋습니다.",
-            ],
-        },
-        {
-            "heading": "Batch와 epoch는 관찰 단위입니다",
-            "paragraphs": [
-                "Batch size는 한 번 업데이트할 때 보는 샘플 수이고, epoch는 전체 데이터를 몇 번 반복해서 볼지입니다.",
-                "작은 batch는 noisy하지만 빠르게 자주 업데이트하고, 큰 batch는 안정적이지만 일반화 특성이 달라질 수 있습니다.",
-            ],
-        },
-    ],
-    "cnn-architectures": [
-        {
-            "heading": "Convolution은 위치 주변의 패턴을 봅니다",
-            "paragraphs": [
-                "CNN은 작은 필터를 이미지 전체에 적용해 edge, texture, shape 같은 지역 패턴을 찾습니다.",
-                "이미지 데이터에서는 모든 픽셀을 독립적으로 보는 MLP보다 공간 구조를 더 잘 활용할 수 있습니다.",
-            ],
-        },
-        {
-            "heading": "Pooling은 중요한 신호를 압축합니다",
-            "paragraphs": [
-                "Pooling은 feature map의 크기를 줄이면서 강한 반응을 남깁니다. 계산량을 줄이고 작은 위치 변화에도 덜 민감하게 만듭니다.",
-                "다만 너무 많이 줄이면 세밀한 정보가 사라지므로 CNN layer와 균형을 맞춰야 합니다.",
-            ],
-        },
-        {
-            "heading": "깊이는 계층적 표현을 만듭니다",
-            "paragraphs": [
-                "초기 층은 단순한 선과 질감을, 뒤쪽 층은 더 큰 부품과 클래스 단서를 보는 경향이 있습니다.",
-                "Feature map이나 Grad-CAM을 함께 보면 모델이 이미지의 어느 부분을 근거로 삼는지 더 직관적으로 확인할 수 있습니다.",
+                "Pooling은 중요한 반응을 남기면서 feature map 크기를 줄여 계산량을 낮추고 작은 위치 변화에 덜 민감하게 만듭니다.",
+                "다만 너무 과하게 줄이면 세부 정보가 사라질 수 있으므로 convolution 층과 균형 있게 사용해야 합니다.",
             ],
         },
     ],
@@ -210,6 +185,20 @@ def chat_with_learning_gemini(
     selected_image_base64: str | None,
     selected_image_mime_type: str | None,
 ) -> dict[str, str]:
+    gateway_api_key = _gateway_api_key()
+    if gateway_api_key:
+        return _chat_with_learning_gateway(
+            question=question,
+            chapter_id=chapter_id,
+            chapter_title=chapter_title,
+            source_label=source_label,
+            source_url=source_url,
+            lecture_context=lecture_context,
+            selected_excerpt=selected_excerpt,
+            selected_image_base64=selected_image_base64,
+            selected_image_mime_type=selected_image_mime_type,
+        )
+
     api_key = _gemini_api_key()
     model = _gemini_model()
 
@@ -304,5 +293,104 @@ def chat_with_learning_gemini(
     answer = parsed.get("answer")
     if not isinstance(answer, str) or not answer.strip():
         raise ValueError("Gemini learning response did not include an answer")
+
+    return {"answer": answer.strip()}
+
+
+def _chat_with_learning_gateway(
+    *,
+    question: str,
+    chapter_id: str,
+    chapter_title: str,
+    source_label: str,
+    source_url: str,
+    lecture_context: str,
+    selected_excerpt: str | None,
+    selected_image_base64: str | None,
+    selected_image_mime_type: str | None,
+) -> dict[str, str]:
+    api_key = _gateway_api_key(required=True)
+    model = _gateway_model()
+
+    excerpt_block = selected_excerpt.strip() if selected_excerpt else ""
+    context = lecture_context.strip()[:10000]
+    has_image = bool(selected_image_base64 and selected_image_mime_type)
+    system_instruction = (
+        "너는 VisAible Learning 섹터의 Gemini 학습 코치다. "
+        "반드시 한국어로 답하고, 사용자가 드롭한 PDF 캡처 내용이나 텍스트를 최우선 근거로 삼아라. "
+        "PDF 캡처 내용이 있으면 먼저 그 안에서 보이는 수식, 도표, 축, 레이블, 문장, 시각적 관계를 구체적으로 읽고, "
+        "그 다음 이것이 현재 챕터의 개념과 어떻게 연결되는지 설명해라. "
+        "캡처 내용이 작거나 일부만 보이면 보이는 범위와 불확실한 범위를 분리해서 말해라. "
+        "피상적인 요약으로 끝내지 말고, 학생이 헷갈릴 만한 포인트와 직관을 함께 짚어라. "
+        "답변은 5~8문장으로 하고, 필요하면 짧은 줄바꿈을 써도 된다. "
+        "질문이 모호하면 현재 PDF 캡처/챕터 문맥 안에서 가장 자연스러운 해석으로 답해라. "
+        '오직 JSON만 출력해. 형식은 {"answer":"..."} 하나만 허용한다.'
+    )
+    user_prompt = "\n".join(
+        [
+            f"Chapter ID: {chapter_id}",
+            f"Chapter Title: {chapter_title}",
+            f"Source: {source_label}",
+            f"Source URL: {source_url}",
+            f"Has PDF Captured Content: {'Yes' if has_image else 'No'}",
+            f"Selected Excerpt: {excerpt_block or 'None'}",
+            f"Lecture Context: {context or 'No additional context'}",
+            f"Question: {question.strip()}",
+        ]
+    )
+
+    user_content: list[dict[str, object]] = [{"type": "text", "text": user_prompt}]
+    if selected_image_base64 and selected_image_mime_type:
+        user_content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{selected_image_mime_type};base64,{selected_image_base64}",
+                },
+            }
+        )
+
+    request_payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_content},
+        ],
+        "max_tokens": 1400,
+        "temperature": 0.2,
+    }
+
+    try:
+        response = requests.post(
+            f"{_gateway_base_url()}/chat/completions/",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            json=request_payload,
+            timeout=45,
+        )
+    except requests.RequestException as error:
+        raise ValueError(f"Gateway learning request failed: {error}") from error
+
+    if response.status_code >= 400:
+        raise ValueError(
+            f"Gateway learning request failed: {response.status_code} {_gateway_error_detail(response)}"
+        )
+
+    try:
+        payload = response.json()
+    except ValueError as error:
+        raise ValueError("Gateway learning response was not JSON") from error
+
+    raw_text = _extract_gateway_text(payload)
+    try:
+        parsed = _extract_json_block(raw_text)
+    except ValueError:
+        return {"answer": raw_text.strip()}
+
+    answer = parsed.get("answer")
+    if not isinstance(answer, str) or not answer.strip():
+        raise ValueError("Gateway learning response did not include an answer")
 
     return {"answer": answer.strip()}

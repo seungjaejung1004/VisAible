@@ -31,6 +31,23 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function ensureTargetVisible(target: HTMLElement, safeTop: number, safeBottom: number) {
+  const rect = target.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
+  const isOutsideSafeViewport =
+    rect.top < safeTop || rect.bottom > viewportHeight - safeBottom;
+
+  if (isOutsideSafeViewport) {
+    target.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+      inline: 'nearest',
+    });
+  }
+
+  return !isOutsideSafeViewport;
+}
+
 export function TutorialCoachOverlay({
   open,
   stepKey,
@@ -66,6 +83,7 @@ export function TutorialCoachOverlay({
     setCardAnchorRect(null);
     let frameId: number | null = null;
     let intervalId: number | null = null;
+    let targetSettledInView = false;
 
     const syncRect = () => {
       frameId = null;
@@ -75,6 +93,11 @@ export function TutorialCoachOverlay({
       if (targets.length === 0) {
         setTargetRect(null);
         return;
+      }
+
+      if (!targetSettledInView) {
+        const primaryTarget = targets[0];
+        targetSettledInView = ensureTargetVisible(primaryTarget, 108, 240);
       }
 
       const rects = targets.map((target) => target.getBoundingClientRect());

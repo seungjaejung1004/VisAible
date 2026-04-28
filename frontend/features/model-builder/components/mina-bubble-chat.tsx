@@ -58,14 +58,11 @@ export function MinaBubbleChat({
 
       <section className="ui-electric-cyan-border relative w-[min(390px,calc(100vw-176px))] rounded-[30px] px-5 pb-4 pt-5 text-[#10213b] shadow-[0_24px_50px_rgba(15,23,42,0.16)] backdrop-blur-xl">
         <div className="absolute bottom-8 -left-3 h-6 w-6 rotate-45 rounded-[4px] border-[2.5px] border-transparent bg-[linear-gradient(rgba(244,248,255,0.98),rgba(244,248,255,0.98))_padding-box,linear-gradient(135deg,rgba(17,81,255,0.84),rgba(47,108,255,0.78),rgba(90,145,255,0.72),rgba(145,197,255,0.68))_border-box]" />
-        <div className="absolute left-6 top-0 inline-flex min-h-[34px] -translate-y-1/2 items-center rounded-full bg-[#f8fafc] px-4 py-1 text-[13px] font-black uppercase tracking-[0.04em] text-[#10213b] shadow-[0_8px_16px_rgba(15,23,42,0.12)] ring-1 ring-[rgba(255,255,255,0.82)]">
-          Mina
-        </div>
 
         <div className="flex items-start justify-between gap-3 pt-2">
           <div>
             <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#7c8ca5]">
-              Quick Guide
+              Mina Quick Guide
             </div>
             <div className="mt-1 font-display text-[18px] font-bold tracking-[-0.04em] text-[#10213b]">
               어떤 블록부터 고치면 좋을까?

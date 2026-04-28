@@ -19,7 +19,10 @@ from app.schemas.competition import (
     CompetitionSubmitRequest,
 )
 from app.services.datasets import (
+    FLOWERS102_DATA_DIR,
     MNIST_DATA_DIR,
+    OXFORD_PET_DATA_DIR,
+    allow_unverified_ssl,
     ensure_cifar10_downloaded,
     ensure_mnist_downloaded,
     ensure_tiny_imagenet_downloaded,
@@ -42,15 +45,23 @@ PUBLIC_EVAL_CONFIG = {
     "fashion_mnist": 100,
     "cifar10": 100,
     "imagenet": 12,
+    "oxford_iiit_pet": 8,
+    "flowers102": 4,
 }
 PRIVATE_EVAL_CONFIG = {
     "mnist": 100,
     "fashion_mnist": 100,
     "cifar10": 100,
     "imagenet": 12,
+    "oxford_iiit_pet": 8,
+    "flowers102": 4,
 }
 EVAL_BATCH_SIZE = 64
 KST = timezone(timedelta(hours=9))
+
+
+def _log_competition_runtime(message: str) -> None:
+    print(f"[competition] {message}", flush=True)
 
 
 def _connect() -> sqlite3.Connection:
@@ -466,6 +477,47 @@ def _build_imagenet_eval_dataset():
     return dataset, labels
 
 
+def _build_oxford_pet_eval_dataset():
+    from torchvision import datasets
+
+    _log_competition_runtime("Preparing Oxford-IIIT Pet evaluation dataset download/load")
+    try:
+        with allow_unverified_ssl():
+            dataset = datasets.OxfordIIITPet(
+                root=str(OXFORD_PET_DATA_DIR),
+                split="test",
+                target_types="category",
+                download=True,
+                transform=_classification_transform("oxford_iiit_pet", 128),
+            )
+    except Exception as error:
+        _log_competition_runtime(f"Oxford-IIIT Pet evaluation dataset failed: {error}")
+        raise
+    _log_competition_runtime("Oxford-IIIT Pet evaluation dataset ready")
+    labels = np.array(getattr(dataset, "_labels", []), dtype=np.int64)
+    return dataset, labels
+
+
+def _build_flowers102_eval_dataset():
+    from torchvision import datasets
+
+    _log_competition_runtime("Preparing Flowers102 evaluation dataset download/load")
+    try:
+        with allow_unverified_ssl():
+            dataset = datasets.Flowers102(
+                root=str(FLOWERS102_DATA_DIR),
+                split="test",
+                download=True,
+                transform=_classification_transform("flowers102", 128),
+            )
+    except Exception as error:
+        _log_competition_runtime(f"Flowers102 evaluation dataset failed: {error}")
+        raise
+    _log_competition_runtime("Flowers102 evaluation dataset ready")
+    labels = np.array(getattr(dataset, "_labels", []), dtype=np.int64)
+    return dataset, labels
+
+
 def _build_competition_eval_loaders(dataset_id: str) -> tuple[DataLoader, DataLoader]:
     if dataset_id == "mnist":
         dataset, labels = _build_mnist_eval_dataset()
@@ -478,6 +530,12 @@ def _build_competition_eval_loaders(dataset_id: str) -> tuple[DataLoader, DataLo
         return _build_eval_split_loaders(dataset, labels, dataset_id)
     if dataset_id == "imagenet":
         dataset, labels = _build_imagenet_eval_dataset()
+        return _build_eval_split_loaders(dataset, labels, dataset_id)
+    if dataset_id == "oxford_iiit_pet":
+        dataset, labels = _build_oxford_pet_eval_dataset()
+        return _build_eval_split_loaders(dataset, labels, dataset_id)
+    if dataset_id == "flowers102":
+        dataset, labels = _build_flowers102_eval_dataset()
         return _build_eval_split_loaders(dataset, labels, dataset_id)
     raise ValueError(f"Competition dataset '{dataset_id}' is not supported")
 

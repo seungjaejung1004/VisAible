@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#f7fbff"/>
+  <rect x="10" y="10" width="108" height="108" rx="18" fill="#d6ebff"/>
+  <path d="M30 50c0-14 15-25 34-25s34 11 34 25v22c0 17-15 31-34 31S30 89 30 72V50z" fill="#fff4e5"/>
+  <path d="M26 56c-7-4-10-15-4-25 5-9 13-9 18-5l4 20zM102 56c7-4 10-15 4-25-5-9-13-9-18-5l-4 20z" fill="#8d5b3d"/>
+  <circle cx="53" cy="67" r="5" fill="#10213b"/>
+  <circle cx="75" cy="67" r="5" fill="#10213b"/>
+  <path d="M57 81c4 3 10 3 14 0" stroke="#8d5b3d" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <text x="64" y="114" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#4c698d">Beagle</text>
+</svg>

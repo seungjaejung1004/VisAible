@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 from importlib import import_module
 from math import sqrt
+from pathlib import Path
 
 import numpy as np
 import requests
@@ -40,7 +42,9 @@ STOCK_PRESETS = [
     },
 ]
 
-STOCK_HISTORY_CACHE: dict[tuple[str, str], tuple[list[str], np.ndarray]] = {}
+STOCK_HISTORY_CACHE_TTL = timedelta(minutes=20)
+STOCK_HISTORY_CACHE: dict[tuple[str, str], tuple[datetime, list[str], np.ndarray]] = {}
+STOCK_MODEL_DIR = Path(__file__).resolve().parents[2] / "data" / "stock_models"
 
 
 class StockLSTM(nn.Module):
@@ -143,6 +147,337 @@ def search_stocks(query: str) -> list[dict[str, str]]:
     return results[:8]
 
 
+def train_and_save_stock_model_artifact(
+    ticker: str,
+    *,
+    lookback_window: int = 30,
+    validation_samples: int = 36,
+    max_epochs: int = 72,
+    batch_size: int = 32,
+    hidden_size: int = 64,
+    num_layers: int = 2,
+    dropout: float = 0.15,
+    learning_rate: float = 0.001,
+    period: str = "2y",
+) -> dict[str, object]:
+    normalized_ticker = ticker.upper()
+    dates, prices = _load_stock_history(normalized_ticker, period=period)
+    sample_count = len(prices) - lookback_window
+    if sample_count <= validation_samples + 24:
+        raise ValueError(f"{normalized_ticker}는 사전학습용 시퀀스를 만들기에 데이터가 부족합니다.")
+
+    training_samples = sample_count - validation_samples
+    training_prices = prices[: training_samples + lookback_window]
+    min_price = float(training_prices.min())
+    max_price = float(training_prices.max())
+    scale = max(max_price - min_price, 1e-6)
+    normalized_prices = (prices - min_price) / scale
+
+    windows: list[np.ndarray] = []
+    targets: list[float] = []
+    target_dates: list[str] = []
+    target_prices: list[float] = []
+
+    for index in range(lookback_window, len(normalized_prices)):
+        windows.append(normalized_prices[index - lookback_window:index].astype(np.float32))
+        targets.append(float(normalized_prices[index]))
+        target_dates.append(dates[index])
+        target_prices.append(float(prices[index]))
+
+    train_x = np.stack(windows[:training_samples]).reshape(training_samples, lookback_window, 1)
+    train_y = np.asarray(targets[:training_samples], dtype=np.float32)
+    val_x = np.stack(windows[training_samples:]).reshape(validation_samples, lookback_window, 1)
+    val_y = np.asarray(targets[training_samples:], dtype=np.float32)
+
+    train_dataset = TensorDataset(torch.tensor(train_x), torch.tensor(train_y))
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=min(batch_size, training_samples),
+        shuffle=True,
+    )
+
+    device = _get_stock_device()
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(42)
+
+    model, architecture = _build_default_stock_model(
+        hidden_size=hidden_size,
+        num_layers=num_layers,
+        dropout=dropout,
+    )
+    model = model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    loss_fn = nn.MSELoss()
+
+    val_x_tensor = torch.tensor(val_x, dtype=torch.float32, device=device)
+    val_y_tensor = torch.tensor(val_y, dtype=torch.float32, device=device)
+    val_last_input_tensor = val_x_tensor[:, -1, 0]
+
+    best_val_loss = float("inf")
+    best_epoch = 0
+    best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
+    patience = 10
+    stale_epochs = 0
+    losses: list[dict[str, float | int]] = []
+
+    for epoch in range(1, max_epochs + 1):
+        model.train()
+        running_loss = 0.0
+        running_direction_accuracy = 0.0
+
+        for batch_x, batch_y in train_loader:
+            batch_x = batch_x.to(device)
+            batch_y = batch_y.to(device)
+            optimizer.zero_grad()
+            predictions = model(batch_x).squeeze(-1)
+            loss = loss_fn(predictions, batch_y)
+            loss.backward()
+            optimizer.step()
+            running_loss += float(loss.item()) * batch_x.size(0)
+
+            last_input = batch_x[:, -1, 0]
+            running_direction_accuracy += _direction_accuracy(predictions.detach(), batch_y, last_input) * batch_x.size(0)
+
+        train_loss = running_loss / training_samples
+        train_direction_accuracy = running_direction_accuracy / training_samples
+
+        model.eval()
+        with torch.no_grad():
+            validation_predictions = model(val_x_tensor).squeeze(-1)
+            validation_loss = float(loss_fn(validation_predictions, val_y_tensor).item())
+            validation_direction_accuracy = _direction_accuracy(
+                validation_predictions,
+                val_y_tensor,
+                val_last_input_tensor,
+            )
+
+        losses.append(
+            {
+                "epoch": epoch,
+                "trainLoss": round(train_loss, 6),
+                "validationLoss": round(validation_loss, 6),
+                "trainDirectionAccuracy": round(train_direction_accuracy, 4),
+                "validationDirectionAccuracy": round(validation_direction_accuracy, 4),
+            }
+        )
+
+        if validation_loss < best_val_loss - 1e-6:
+            best_val_loss = validation_loss
+            best_epoch = epoch
+            best_state = {name: tensor.detach().cpu().clone() for name, tensor in model.state_dict().items()}
+            stale_epochs = 0
+        else:
+            stale_epochs += 1
+
+        if stale_epochs >= patience:
+            break
+
+    model.load_state_dict(best_state)
+    model = model.to(device)
+    model.eval()
+
+    with torch.no_grad():
+        train_predictions = model(torch.tensor(train_x, dtype=torch.float32, device=device)).squeeze(-1).cpu().numpy()
+        validation_predictions = model(val_x_tensor).squeeze(-1).cpu().numpy()
+
+    train_predictions_price = _inverse_scale(train_predictions, min_price, scale)
+    train_actual_price = _inverse_scale(train_y, min_price, scale)
+    validation_predictions_price = _inverse_scale(validation_predictions, min_price, scale)
+    validation_actual_price = _inverse_scale(val_y, min_price, scale)
+    validation_direction_accuracy = _direction_accuracy(
+        torch.tensor(validation_predictions, dtype=torch.float32),
+        torch.tensor(val_y, dtype=torch.float32),
+        torch.tensor(val_x[:, -1, 0], dtype=torch.float32),
+    )
+
+    STOCK_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    artifact_path = STOCK_MODEL_DIR / f"{normalized_ticker.lower()}.pt"
+    metadata_path = STOCK_MODEL_DIR / f"{normalized_ticker.lower()}.json"
+
+    artifact = {
+        "ticker": normalized_ticker,
+        "companyName": next((item["label"] for item in STOCK_PRESETS if item["ticker"] == normalized_ticker), normalized_ticker),
+        "sector": next((item["sector"] for item in STOCK_PRESETS if item["ticker"] == normalized_ticker), "Market"),
+        "period": period,
+        "lookbackWindow": lookback_window,
+        "hiddenSize": hidden_size,
+        "numLayers": num_layers,
+        "dropout": dropout,
+        "learningRate": learning_rate,
+        "batchSize": batch_size,
+        "epochsRan": len(losses),
+        "bestEpoch": best_epoch,
+        "lastTrainingDate": dates[-1],
+        "trainedAt": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "minPrice": min_price,
+        "scale": scale,
+        "architecture": architecture,
+        "validationRmse": round(_rmse(validation_predictions_price, validation_actual_price), 4),
+        "trainRmse": round(_rmse(train_predictions_price, train_actual_price), 4),
+        "validationDirectionAccuracy": round(validation_direction_accuracy, 4),
+        "stateDict": best_state,
+    }
+    torch.save(artifact, artifact_path)
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "ticker": artifact["ticker"],
+                "companyName": artifact["companyName"],
+                "sector": artifact["sector"],
+                "period": artifact["period"],
+                "lookbackWindow": artifact["lookbackWindow"],
+                "hiddenSize": artifact["hiddenSize"],
+                "numLayers": artifact["numLayers"],
+                "dropout": artifact["dropout"],
+                "learningRate": artifact["learningRate"],
+                "batchSize": artifact["batchSize"],
+                "epochsRan": artifact["epochsRan"],
+                "bestEpoch": artifact["bestEpoch"],
+                "lastTrainingDate": artifact["lastTrainingDate"],
+                "trainedAt": artifact["trainedAt"],
+                "validationRmse": artifact["validationRmse"],
+                "trainRmse": artifact["trainRmse"],
+                "validationDirectionAccuracy": artifact["validationDirectionAccuracy"],
+                "architecture": artifact["architecture"],
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return artifact
+
+
+def get_stock_blackbox_prediction(ticker: str) -> dict[str, object]:
+    pretrained_prediction = _get_pretrained_stock_prediction(ticker)
+    if pretrained_prediction is not None:
+        return pretrained_prediction
+
+    period = "6mo"
+    dates, prices = _load_stock_history(ticker, period=period)
+    if len(prices) < 65:
+        raise ValueError("예측에 필요한 최근 주가 이력이 충분하지 않습니다. 다른 종목을 선택해 주세요.")
+
+    normalized_ticker = ticker.upper()
+    preset = next((item for item in STOCK_PRESETS if item["ticker"] == normalized_ticker), None)
+    company_name = preset["label"] if preset else normalized_ticker
+    sector = preset["sector"] if preset else "Market"
+
+    latest_close = float(prices[-1])
+    latest_date = dates[-1]
+    predicted_date = _future_business_days(latest_date, 1)[0]
+    returns = np.diff(prices) / prices[:-1]
+
+    recent_change_pct = ((latest_close / float(prices[-6])) - 1.0) * 100
+    monthly_window = prices[-22:]
+    monthly_low = float(monthly_window.min())
+    monthly_high = float(monthly_window.max())
+    volatility_pct = float(np.std(returns[-20:]) * 100)
+
+    short_momentum = (latest_close / float(prices[-6])) - 1.0
+    medium_momentum = (latest_close / float(prices[-21])) - 1.0
+    long_momentum = (latest_close / float(prices[-61])) - 1.0
+    sma5 = float(np.mean(prices[-5:]))
+    sma20 = float(np.mean(prices[-20:]))
+    sma60 = float(np.mean(prices[-60:]))
+
+    trend_signal = ((sma5 / sma20) - 1.0) * 0.6 + ((sma20 / sma60) - 1.0) * 0.4
+    momentum_signal = short_momentum * 0.5 + medium_momentum * 0.35 + long_momentum * 0.15
+    mean_reversion_signal = -(((latest_close / sma20) - 1.0) * 0.18)
+    raw_return = momentum_signal * 0.55 + trend_signal * 0.35 + mean_reversion_signal * 0.10
+    expected_return = float(np.clip(raw_return, -0.065, 0.065))
+    predicted_close = latest_close * (1.0 + expected_return)
+
+    direction = "flat"
+    if expected_return > 0.003:
+        direction = "up"
+    elif expected_return < -0.003:
+        direction = "down"
+
+    expected_sign = 1 if expected_return > 0 else -1 if expected_return < 0 else 0
+    component_signs = [
+        1 if momentum_signal > 0 else -1 if momentum_signal < 0 else 0,
+        1 if trend_signal > 0 else -1 if trend_signal < 0 else 0,
+        1 if mean_reversion_signal > 0 else -1 if mean_reversion_signal < 0 else 0,
+    ]
+    agreement = sum(1 for sign in component_signs if sign == expected_sign and sign != 0)
+    confidence = int(round(np.clip(56 + agreement * 8 + max(0.0, 3.2 - volatility_pct) * 4.5, 52, 91)))
+
+    range_width = max(latest_close * max(volatility_pct / 100.0, 0.008) * 1.35, latest_close * 0.01)
+    range_low = predicted_close - range_width
+    range_high = predicted_close + range_width
+
+    summary = _stock_summary(direction, predicted_close, expected_return, confidence)
+    reasons = _stock_reasons(
+        short_momentum=short_momentum,
+        medium_momentum=medium_momentum,
+        latest_close=latest_close,
+        sma20=sma20,
+        sma60=sma60,
+        volatility_pct=volatility_pct,
+    )
+
+    history = [
+        {
+            "date": dates[index],
+            "close": round(float(prices[index]), 2),
+        }
+        for index in range(max(0, len(dates) - 30), len(dates))
+    ]
+    forecast = [
+        {
+            "date": predicted_date,
+            "close": round(float(predicted_close), 2),
+        }
+    ]
+
+    return {
+        "ticker": normalized_ticker,
+        "companyName": company_name,
+        "sector": sector,
+        "period": period,
+        "modelLabel": "VisAIble Black-Box v1",
+        "generatedAt": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "latestDate": latest_date,
+        "predictedDate": predicted_date,
+        "direction": direction,
+        "summary": summary,
+        "reasons": reasons,
+        "history": history,
+        "forecast": forecast,
+        "signals": [
+            {
+                "label": "5일 모멘텀",
+                "value": f"{short_momentum * 100:+.2f}%",
+                "tone": _signal_tone(short_momentum),
+            },
+            {
+                "label": "20일 추세",
+                "value": f"{((sma5 / sma20) - 1.0) * 100:+.2f}%",
+                "tone": _signal_tone((sma5 / sma20) - 1.0),
+            },
+            {
+                "label": "변동성",
+                "value": f"{volatility_pct:.2f}%",
+                "tone": "negative" if volatility_pct >= 3.2 else "neutral",
+            },
+        ],
+        "metrics": {
+            "latestClose": round(latest_close, 2),
+            "predictedClose": round(float(predicted_close), 2),
+            "predictedChangePct": round(expected_return * 100, 2),
+            "confidence": confidence,
+            "recentChangePct": round(recent_change_pct, 2),
+            "monthlyLow": round(monthly_low, 2),
+            "monthlyHigh": round(monthly_high, 2),
+            "volatilityPct": round(volatility_pct, 2),
+            "rangeLow": round(float(range_low), 2),
+            "rangeHigh": round(float(range_high), 2),
+        },
+    }
+
+
 def train_stock_lstm(payload: StockTrainingRequest) -> dict[str, object]:
     period = "2y"
     dates, prices = _load_stock_history(payload.ticker, period=period)
@@ -186,7 +521,7 @@ def train_stock_lstm(payload: StockTrainingRequest) -> dict[str, object]:
         shuffle=True,
     )
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = _get_stock_device()
     torch.manual_seed(42)
     model, architecture = _build_stock_model(payload.nodes, payload.hiddenSize)
     model = model.to(device)
@@ -446,6 +781,169 @@ def _build_stock_model(
     return StockLSTM(lstm_layers=lstm_layers, head_layers=head_layers), architecture
 
 
+def _build_default_stock_model(
+    *,
+    hidden_size: int,
+    num_layers: int,
+    dropout: float,
+) -> tuple[StockLSTM, list[str]]:
+    model = StockLSTM(
+        lstm_layers=[
+            {
+                "input_size": 1,
+                "hidden_size": hidden_size,
+                "num_layers": num_layers,
+            }
+        ],
+        head_layers=[
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_size, 1),
+        ],
+    )
+    architecture = [
+        f"LSTM(1->{hidden_size}, layers={num_layers})",
+        f"Dropout(p={dropout:.2f})",
+        f"Linear({hidden_size}->1)",
+    ]
+    return model, architecture
+
+
+def _get_pretrained_stock_prediction(ticker: str) -> dict[str, object] | None:
+    artifact_path = STOCK_MODEL_DIR / f"{ticker.lower()}.pt"
+    if not artifact_path.exists():
+        return None
+
+    artifact = torch.load(artifact_path, map_location="cpu", weights_only=False)
+    normalized_ticker = str(artifact["ticker"]).upper()
+    period = str(artifact.get("period") or "2y")
+    dates, prices = _load_stock_history(normalized_ticker, period=period)
+    lookback_window = int(artifact["lookbackWindow"])
+    if len(prices) < lookback_window + 5:
+        return None
+
+    min_price = float(artifact["minPrice"])
+    scale = max(float(artifact["scale"]), 1e-6)
+    hidden_size = int(artifact["hiddenSize"])
+    num_layers = int(artifact["numLayers"])
+    dropout = float(artifact["dropout"])
+    model, architecture = _build_default_stock_model(
+        hidden_size=hidden_size,
+        num_layers=num_layers,
+        dropout=dropout,
+    )
+    state_dict = artifact["stateDict"]
+    model.load_state_dict(state_dict)
+    device = _get_stock_device()
+    model = model.to(device)
+    model.eval()
+
+    rolling_window = ((prices[-lookback_window:] - min_price) / scale).astype(np.float32)
+    with torch.no_grad():
+        input_tensor = torch.tensor(rolling_window.reshape(1, lookback_window, 1), dtype=torch.float32, device=device)
+        predicted_value = float(model(input_tensor).squeeze().item())
+
+    predicted_close = predicted_value * scale + min_price
+    latest_close = float(prices[-1])
+    latest_date = dates[-1]
+    predicted_date = _future_business_days(latest_date, 1)[0]
+    returns = np.diff(prices) / prices[:-1]
+    recent_change_pct = ((latest_close / float(prices[-6])) - 1.0) * 100
+    monthly_window = prices[-22:]
+    monthly_low = float(monthly_window.min())
+    monthly_high = float(monthly_window.max())
+    volatility_pct = float(np.std(returns[-20:]) * 100)
+    predicted_change_pct = ((predicted_close / latest_close) - 1.0) * 100 if latest_close else 0.0
+
+    direction = "flat"
+    if predicted_change_pct > 0.3:
+        direction = "up"
+    elif predicted_change_pct < -0.3:
+        direction = "down"
+
+    val_rmse = float(artifact.get("validationRmse") or 0.0)
+    val_direction_accuracy = float(artifact.get("validationDirectionAccuracy") or 0.5)
+    confidence = int(
+        round(
+            np.clip(
+                58 + val_direction_accuracy * 28 + max(0.0, 4.0 - volatility_pct) * 3.5 - min(val_rmse / max(latest_close, 1.0), 0.08) * 120,
+                54,
+                93,
+            )
+        )
+    )
+    range_width = max(val_rmse * 1.15, latest_close * max(volatility_pct / 100.0, 0.008))
+    range_low = predicted_close - range_width
+    range_high = predicted_close + range_width
+    summary = _pretrained_stock_summary(
+        direction=direction,
+        predicted_close=predicted_close,
+        predicted_change_pct=predicted_change_pct,
+        confidence=confidence,
+        val_direction_accuracy=val_direction_accuracy,
+    )
+    reasons = [
+        f"미리 학습된 LSTM은 최근 {lookback_window}거래일 시퀀스를 읽고 다음 거래일 종가를 예측했습니다.",
+        f"저장된 모델의 검증 RMSE는 {val_rmse:.2f}, 방향성 정확도는 {val_direction_accuracy * 100:.1f}%입니다.",
+        f"최근 20거래일 변동성은 {volatility_pct:.2f}%로 계산되어 예측 범위를 {range_low:.2f} ~ {range_high:.2f}달러로 잡았습니다.",
+    ]
+
+    return {
+        "ticker": normalized_ticker,
+        "companyName": str(artifact.get("companyName") or normalized_ticker),
+        "sector": str(artifact.get("sector") or "Market"),
+        "period": period,
+        "modelLabel": "Pretrained LSTM v1",
+        "generatedAt": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "latestDate": latest_date,
+        "predictedDate": predicted_date,
+        "direction": direction,
+        "summary": summary,
+        "reasons": reasons,
+        "history": [
+            {
+                "date": dates[index],
+                "close": round(float(prices[index]), 2),
+            }
+            for index in range(max(0, len(dates) - 30), len(dates))
+        ],
+        "forecast": [
+            {
+                "date": predicted_date,
+                "close": round(float(predicted_close), 2),
+            }
+        ],
+        "signals": [
+            {
+                "label": "예측 변화율",
+                "value": f"{predicted_change_pct:+.2f}%",
+                "tone": _signal_tone(predicted_change_pct),
+            },
+            {
+                "label": "검증 방향성",
+                "value": f"{val_direction_accuracy * 100:.1f}%",
+                "tone": "positive" if val_direction_accuracy >= 0.55 else "neutral",
+            },
+            {
+                "label": "변동성",
+                "value": f"{volatility_pct:.2f}%",
+                "tone": "negative" if volatility_pct >= 3.2 else "neutral",
+            },
+        ],
+        "metrics": {
+            "latestClose": round(latest_close, 2),
+            "predictedClose": round(float(predicted_close), 2),
+            "predictedChangePct": round(float(predicted_change_pct), 2),
+            "confidence": confidence,
+            "recentChangePct": round(recent_change_pct, 2),
+            "monthlyLow": round(monthly_low, 2),
+            "monthlyHigh": round(monthly_high, 2),
+            "volatilityPct": round(volatility_pct, 2),
+            "rangeLow": round(float(range_low), 2),
+            "rangeHigh": round(float(range_high), 2),
+        },
+    }
+
+
 def _load_yfinance():
     try:
         return import_module("yfinance")
@@ -455,31 +953,74 @@ def _load_yfinance():
         ) from error
 
 
+def _get_stock_device() -> torch.device:
+    mps_backend = getattr(torch.backends, "mps", None)
+    if mps_backend and mps_backend.is_available():
+        return torch.device("mps")
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return torch.device("cpu")
+
+
 def _load_stock_history(ticker: str, period: str) -> tuple[list[str], np.ndarray]:
     normalized_ticker = ticker.upper()
     cache_key = (normalized_ticker, period)
     cached = STOCK_HISTORY_CACHE.get(cache_key)
     if cached is not None:
-        cached_dates, cached_prices = cached
-        return list(cached_dates), cached_prices.copy()
-
-    yf = _load_yfinance()
+        cached_at, cached_dates, cached_prices = cached
+        if datetime.utcnow() - cached_at <= STOCK_HISTORY_CACHE_TTL:
+            return list(cached_dates), cached_prices.copy()
 
     try:
-        history = yf.Ticker(normalized_ticker).history(period=period, interval="1d", auto_adjust=False)
-    except Exception as error:
-        raise ValueError(f"{normalized_ticker} 데이터를 가져오지 못했습니다: {error}") from error
+        response = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{normalized_ticker}",
+            params={
+                "range": period,
+                "interval": "1d",
+                "includePrePost": "false",
+                "events": "div,splits",
+            },
+            timeout=20,
+            headers={
+                "User-Agent": "Mozilla/5.0 VisAIble Playground",
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+        result = ((payload.get("chart") or {}).get("result") or [None])[0]
+        timestamps = result.get("timestamp") if isinstance(result, dict) else None
+        closes = ((((result or {}).get("indicators") or {}).get("quote") or [{}])[0]).get("close")
+        if not timestamps or not closes:
+            raise ValueError("chart payload empty")
 
-    if history is None or history.empty or "Close" not in history:
-        raise ValueError(f"{normalized_ticker} 주가 데이터를 찾지 못했습니다. 다른 티커를 선택해 주세요.")
+        pairs = [
+            (datetime.utcfromtimestamp(int(timestamp)).strftime("%Y-%m-%d"), float(close))
+            for timestamp, close in zip(timestamps, closes)
+            if close is not None
+        ]
+        if not pairs:
+            raise ValueError("close values empty")
 
-    close_series = history["Close"].dropna()
-    if close_series.empty:
-        raise ValueError(f"{normalized_ticker} 종가 데이터가 비어 있습니다.")
+        dates = [date for date, _ in pairs]
+        prices = np.asarray([price for _, price in pairs], dtype=np.float32)
+    except Exception:
+        yf = _load_yfinance()
+        try:
+            history = yf.Ticker(normalized_ticker).history(period=period, interval="1d", auto_adjust=False)
+        except Exception as error:
+            raise ValueError(f"{normalized_ticker} 데이터를 가져오지 못했습니다: {error}") from error
 
-    dates = [index.strftime("%Y-%m-%d") for index in close_series.index.to_pydatetime()]
-    prices = close_series.to_numpy(dtype=np.float32)
-    STOCK_HISTORY_CACHE[cache_key] = (dates, prices.copy())
+        if history is None or history.empty or "Close" not in history:
+            raise ValueError(f"{normalized_ticker} 주가 데이터를 찾지 못했습니다. 다른 티커를 선택해 주세요.")
+
+        close_series = history["Close"].dropna()
+        if close_series.empty:
+            raise ValueError(f"{normalized_ticker} 종가 데이터가 비어 있습니다.")
+
+        dates = [index.strftime("%Y-%m-%d") for index in close_series.index.to_pydatetime()]
+        prices = close_series.to_numpy(dtype=np.float32)
+
+    STOCK_HISTORY_CACHE[cache_key] = (datetime.utcnow(), dates, prices.copy())
     return dates, prices
 
 
@@ -568,3 +1109,85 @@ def _future_business_days(last_date: str, count: int) -> list[str]:
         dates.append(cursor.strftime("%Y-%m-%d"))
 
     return dates
+
+
+def _signal_tone(value: float) -> str:
+    if value > 0:
+        return "positive"
+    if value < 0:
+        return "negative"
+    return "neutral"
+
+
+def _pretrained_stock_summary(
+    *,
+    direction: str,
+    predicted_close: float,
+    predicted_change_pct: float,
+    confidence: int,
+    val_direction_accuracy: float,
+) -> str:
+    if direction == "up":
+        return (
+            f"미리 학습된 LSTM 모델은 다음 거래일 종가를 {predicted_close:.2f}달러로 예측했습니다. "
+            f"예상 변화율은 {predicted_change_pct:+.2f}%이고, 검증 방향성 정확도는 {val_direction_accuracy * 100:.1f}%, "
+            f"현재 신뢰도는 {confidence}%입니다."
+        )
+    if direction == "down":
+        return (
+            f"미리 학습된 LSTM 모델은 단기 조정을 반영해 다음 거래일 종가를 {predicted_close:.2f}달러로 예측했습니다. "
+            f"예상 변화율은 {predicted_change_pct:+.2f}%이고, 검증 방향성 정확도는 {val_direction_accuracy * 100:.1f}%, "
+            f"현재 신뢰도는 {confidence}%입니다."
+        )
+    return (
+        f"미리 학습된 LSTM 모델은 방향성이 크지 않다고 보고 다음 거래일 종가를 {predicted_close:.2f}달러 근처로 예측했습니다. "
+        f"예상 변화율은 {predicted_change_pct:+.2f}%이고, 검증 방향성 정확도는 {val_direction_accuracy * 100:.1f}%, "
+        f"현재 신뢰도는 {confidence}%입니다."
+    )
+
+
+def _stock_summary(direction: str, predicted_close: float, expected_return: float, confidence: int) -> str:
+    if direction == "up":
+        return (
+            f"블랙박스 모델은 최근 모멘텀과 추세가 아직 살아 있다고 보고, "
+            f"다음 거래일 종가를 {predicted_close:.2f}달러로 예측했습니다. "
+            f"예상 수익률은 {expected_return * 100:+.2f}%이고 신뢰도는 {confidence}%입니다."
+        )
+    if direction == "down":
+        return (
+            f"블랙박스 모델은 단기 탄력이 둔화되고 있다고 보고, "
+            f"다음 거래일 종가를 {predicted_close:.2f}달러로 예측했습니다. "
+            f"예상 수익률은 {expected_return * 100:+.2f}%이고 신뢰도는 {confidence}%입니다."
+        )
+    return (
+        f"블랙박스 모델은 방향성이 크지 않다고 보고, "
+        f"다음 거래일 종가를 {predicted_close:.2f}달러 근처로 예측했습니다. "
+        f"예상 변동폭은 {expected_return * 100:+.2f}%이고 신뢰도는 {confidence}%입니다."
+    )
+
+
+def _stock_reasons(
+    *,
+    short_momentum: float,
+    medium_momentum: float,
+    latest_close: float,
+    sma20: float,
+    sma60: float,
+    volatility_pct: float,
+) -> list[str]:
+    relative_to_sma20 = ((latest_close / sma20) - 1.0) * 100
+    trend_vs_sma60 = ((sma20 / sma60) - 1.0) * 100
+
+    momentum_line = (
+        f"최근 5일 수익률은 {short_momentum * 100:+.2f}%, 20일 수익률은 {medium_momentum * 100:+.2f}%로 "
+        f"단기 모멘텀 흐름을 같이 반영했습니다."
+    )
+    trend_line = (
+        f"현재 가격은 20일 평균 대비 {relative_to_sma20:+.2f}% 위치에 있고, "
+        f"20일 평균은 60일 평균 대비 {trend_vs_sma60:+.2f}% 수준이라 추세 방향을 같이 읽었습니다."
+    )
+    volatility_line = (
+        f"최근 20거래일 변동성은 {volatility_pct:.2f}%로 계산되어, "
+        f"변동성이 큰 종목일수록 예측 범위를 더 넓게 잡습니다."
+    )
+    return [momentum_line, trend_line, volatility_line]

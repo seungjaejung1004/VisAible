@@ -21,11 +21,14 @@ from PIL import Image
 
 from app.schemas.training import CanvasNodePayload, EpochMetrics, TrainModelRequest
 from app.services.datasets import (
+    FLOWERS102_DATA_DIR,
     MNIST_DATA_DIR,
+    OXFORD_PET_DATA_DIR,
+    allow_unverified_ssl,
     ensure_cifar10_downloaded,
     ensure_mnist_downloaded,
-    get_dataset_runtime_spec,
     ensure_tiny_imagenet_downloaded,
+    get_dataset_runtime_spec,
 )
 
 
@@ -40,6 +43,10 @@ COMPACT_CIFAR10_TRAIN_PER_CLASS = 1600
 COMPACT_CIFAR10_VAL_PER_CLASS = 400
 COMPACT_TINY_IMAGENET_TRAIN_PER_CLASS = 20
 COMPACT_TINY_IMAGENET_VAL_PER_CLASS = 5
+COMPACT_OXFORD_PET_TRAIN_PER_CLASS = 96
+COMPACT_OXFORD_PET_VAL_PER_CLASS = 24
+COMPACT_FLOWERS102_TRAIN_PER_CLASS = 32
+COMPACT_FLOWERS102_VAL_PER_CLASS = 8
 TRAINING_JOBS: dict[str, dict[str, object]] = {}
 TRAINED_CLASSIFIERS: dict[str, tuple[nn.Module, torch.device, str]] = {}
 DATASET_CACHE: dict[str, tuple[Dataset, np.ndarray]] = {}
@@ -51,6 +58,8 @@ DATASET_NORMALIZATION: dict[str, tuple[tuple[float, ...], tuple[float, ...]]] = 
     "fashion_mnist": ((0.2860,), (0.3530,)),
     "cifar10": ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)),
     "imagenet": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    "oxford_iiit_pet": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+    "flowers102": ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
 }
 SUPPORTED_AUGMENTATIONS = {
     "mixup",
@@ -83,6 +92,8 @@ DECISION_BOUNDARY_WEIGHT_FACTORS: dict[str, float] = {
     "mnist": 10.0,
     "fashion_mnist": 10.0,
     "cifar10": 26.0,
+    "oxford_iiit_pet": 8.0,
+    "flowers102": 8.0,
 }
 DECISION_BOUNDARY_DIR = Path(__file__).resolve().parent.parent / "data" / "decision_boundary"
 FASHION_MNIST_LAUNDRY_CHALLENGE_PATH = (
@@ -92,6 +103,10 @@ FASHION_MNIST_LAUNDRY_CHALLENGE_PATH = (
 
 class TrainingStoppedError(Exception):
     pass
+
+
+def _log_training_runtime(message: str) -> None:
+    print(f"[training] {message}", flush=True)
 
 
 @dataclass
@@ -316,6 +331,10 @@ def _classification_transform(
 def _dataset_targets(dataset: Dataset) -> np.ndarray:
     targets = getattr(dataset, "targets", None)
     if targets is None:
+        targets = getattr(dataset, "_labels", None)
+    if targets is None:
+        targets = getattr(dataset, "labels", None)
+    if targets is None:
         raise ValueError("Dataset does not expose targets for stratified splitting")
     if isinstance(targets, list):
         return np.array(targets, dtype=np.int64)
@@ -445,6 +464,64 @@ def _load_combined_torchvision_dataset(
             download=False,
             transform=transform,
         )
+    elif dataset_id == "oxford_iiit_pet":
+        transform = _classification_transform("oxford_iiit_pet", 128, augmentations, augmentation_params)
+        _log_training_runtime("Preparing Oxford-IIIT Pet dataset download/load")
+        try:
+            with allow_unverified_ssl():
+                train_split = datasets.OxfordIIITPet(
+                    root=str(OXFORD_PET_DATA_DIR),
+                    split="trainval",
+                    target_types="category",
+                    download=True,
+                    transform=transform,
+                )
+                test_split = datasets.OxfordIIITPet(
+                    root=str(OXFORD_PET_DATA_DIR),
+                    split="test",
+                    target_types="category",
+                    download=True,
+                    transform=transform,
+                )
+        except Exception as error:
+            _log_training_runtime(f"Oxford-IIIT Pet download/load failed: {error}")
+            raise
+        _log_training_runtime("Oxford-IIIT Pet dataset ready")
+    elif dataset_id == "flowers102":
+        transform = _classification_transform("flowers102", 128, augmentations, augmentation_params)
+        _log_training_runtime("Preparing Flowers102 dataset download/load")
+        try:
+            with allow_unverified_ssl():
+                train_split = datasets.Flowers102(
+                    root=str(FLOWERS102_DATA_DIR),
+                    split="train",
+                    download=True,
+                    transform=transform,
+                )
+                validation_split = datasets.Flowers102(
+                    root=str(FLOWERS102_DATA_DIR),
+                    split="val",
+                    download=True,
+                    transform=transform,
+                )
+                test_split = datasets.Flowers102(
+                    root=str(FLOWERS102_DATA_DIR),
+                    split="test",
+                    download=True,
+                    transform=transform,
+                )
+        except Exception as error:
+            _log_training_runtime(f"Flowers102 download/load failed: {error}")
+            raise
+        _log_training_runtime("Flowers102 dataset ready")
+        dataset = ConcatDataset([train_split, validation_split, test_split])
+        targets = np.concatenate(
+            [_dataset_targets(train_split), _dataset_targets(validation_split), _dataset_targets(test_split)],
+            axis=0,
+        )
+        result = dataset, targets
+        DATASET_CACHE[cache_key] = result
+        return result
     else:
         raise ValueError(f"Unsupported dataset: {dataset_id}")
 
@@ -476,6 +553,12 @@ def _build_stratified_loaders(
     if dataset_id == "cifar10":
         train_limit_per_class = COMPACT_CIFAR10_TRAIN_PER_CLASS
         validation_limit_per_class = COMPACT_CIFAR10_VAL_PER_CLASS
+    elif dataset_id == "oxford_iiit_pet":
+        train_limit_per_class = COMPACT_OXFORD_PET_TRAIN_PER_CLASS
+        validation_limit_per_class = COMPACT_OXFORD_PET_VAL_PER_CLASS
+    elif dataset_id == "flowers102":
+        train_limit_per_class = COMPACT_FLOWERS102_TRAIN_PER_CLASS
+        validation_limit_per_class = COMPACT_FLOWERS102_VAL_PER_CLASS
 
     generator = np.random.default_rng(RANDOM_STATE)
     train_index_parts: list[np.ndarray] = []
@@ -658,7 +741,7 @@ def build_dataset_loaders(
     augmentations: list[str] | None = None,
     augmentation_params: dict[str, float] | None = None,
 ) -> tuple[DataLoader, DataLoader, int, int]:
-    if dataset_id in {"mnist", "fashion_mnist", "cifar10"}:
+    if dataset_id in {"mnist", "fashion_mnist", "cifar10", "oxford_iiit_pet", "flowers102"}:
         return _build_stratified_loaders(
             dataset_id,
             batch_size,

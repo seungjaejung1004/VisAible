@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#f6fcff"/>
+  <rect x="10" y="10" width="108" height="108" rx="18" fill="#d9eff7"/>
+  <g transform="translate(64 67)" fill="#f4a4c8">
+    <path d="M0-28c7 9 8 18 0 28-8-10-7-19 0-28z"/>
+    <path d="M-18-18c11 4 16 11 15 23-11-4-17-11-15-23z"/>
+    <path d="M18-18c-11 4-16 11-15 23 11-4 17-11 15-23z"/>
+    <path d="M-26 1c12-1 20 3 24 13-12 1-20-3-24-13z"/>
+    <path d="M26 1c-12-1-20 3-24 13 12 1 20-3 24-13z"/>
+  </g>
+  <ellipse cx="64" cy="88" rx="28" ry="8" fill="#7cc39b"/>
+  <text x="64" y="114" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#5c7f89">Lotus</text>
+</svg>

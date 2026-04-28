@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#f8fbff"/>
+  <rect x="10" y="10" width="108" height="108" rx="18" fill="#dfeaf4"/>
+  <path d="M34 47L47 24l11 25M94 47L81 24l-11 25" fill="#5b4b47"/>
+  <ellipse cx="64" cy="69" rx="32" ry="29" fill="#f2e0c5"/>
+  <ellipse cx="51" cy="66" rx="7" ry="10" fill="#3e342f"/>
+  <ellipse cx="77" cy="66" rx="7" ry="10" fill="#3e342f"/>
+  <path d="M58 82c4 3 8 3 12 0" stroke="#5b4b47" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <text x="64" y="114" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#5d6674">Siamese</text>
+</svg>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Icon } from '@/features/model-builder/components/icons';
-import { datasets } from '@/lib/constants/builder-data';
+import { competitionDatasets } from '@/lib/constants/builder-data';
 
 type CompetitionPanelProps = {
   isLoading: boolean;
@@ -103,7 +103,7 @@ const formInputClassName =
 const fieldLabelClassName =
   'text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#71839d]';
 const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const competitionDatasets = datasets.map((dataset) => ({ id: dataset.id, label: dataset.label }));
+const competitionDatasetOptions = competitionDatasets.map((dataset) => ({ id: dataset.id, label: dataset.label }));
 const modeOptions = [
   {
     key: 'make',
@@ -142,7 +142,7 @@ export function CompetitionPanel({
   const [mode, setMode] = useState<'idle' | 'make' | 'enter'>('idle');
   const [hostName, setHostName] = useState('Host');
   const [title, setTitle] = useState('VisAible Competition');
-  const [datasetId, setDatasetId] = useState(datasets[0]?.id ?? 'mnist');
+  const [datasetId, setDatasetId] = useState(competitionDatasets[0]?.id ?? 'mnist');
   const [roomCode, setRoomCode] = useState(makeRandomCode());
   const [password, setPassword] = useState(makeRandomPassword());
   const [endsAt, setEndsAt] = useState('');
@@ -162,7 +162,7 @@ export function CompetitionPanel({
   }, [mode]);
 
   const selectedDatasetLabel =
-    competitionDatasets.find((dataset) => dataset.id === datasetId)?.label ?? datasetId;
+    competitionDatasetOptions.find((dataset) => dataset.id === datasetId)?.label ?? datasetId;
   const selectedDeadline = endsAt ? toCompetitionDeadline(endsAt) : null;
   const isDeadlineExpired = selectedDeadline ? selectedDeadline.getTime() <= Date.now() : false;
   const scheduleWarning = isDeadlineExpired
@@ -320,7 +320,7 @@ export function CompetitionPanel({
             <div className="grid gap-2">
               <div className={fieldLabelClassName}>Dataset</div>
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {competitionDatasets.map((dataset) => {
+                {competitionDatasetOptions.map((dataset) => {
                   const active = datasetId === dataset.id;
 
                   return (

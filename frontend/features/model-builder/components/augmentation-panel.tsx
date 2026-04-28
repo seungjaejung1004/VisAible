@@ -149,9 +149,6 @@ export function AugmentationPanel({
                         <div className="text-[15px] font-semibold tracking-[-0.01em] text-current">
                           {option.label}
                         </div>
-                        <div className="mt-1 text-[12px] font-medium text-[#7a8da8]">
-                          {active ? 'Selected. Click to adjust settings.' : 'Click to select and open settings.'}
-                        </div>
                       </button>
                     </div>
                     {active ? (

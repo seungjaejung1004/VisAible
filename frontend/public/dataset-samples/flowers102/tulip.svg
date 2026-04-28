@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#fff6fb"/>
+  <rect x="10" y="10" width="108" height="108" rx="18" fill="#ffd9ee"/>
+  <path d="M48 70c0-20 10-34 16-34s16 14 16 34c0 12-8 20-16 20s-16-8-16-20z" fill="#ff5ea8"/>
+  <path d="M48 58l16-18 16 18" fill="#ff7dbb"/>
+  <path d="M64 90v16" stroke="#4e9d62" stroke-width="4" stroke-linecap="round"/>
+  <text x="64" y="114" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#a45786">Tulip</text>
+</svg>

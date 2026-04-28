@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#fff8ef"/>
+  <rect x="10" y="10" width="108" height="108" rx="18" fill="#f4d8b8"/>
+  <path d="M34 46L49 26l9 24M94 46L79 26l-9 24" fill="#9c623b"/>
+  <ellipse cx="64" cy="69" rx="34" ry="30" fill="#c9834c"/>
+  <ellipse cx="51" cy="67" rx="5" ry="7" fill="#10213b"/>
+  <ellipse cx="77" cy="67" rx="5" ry="7" fill="#10213b"/>
+  <path d="M57 82c4 4 10 4 14 0" stroke="#7f3f2a" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <text x="64" y="114" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#6c4b35">Abyssinian</text>
+</svg>

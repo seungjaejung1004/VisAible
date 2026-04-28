@@ -110,6 +110,31 @@ function buildDatasetLoaderLines(dataset: DatasetItem) {
     ];
   }
 
+  if (dataset.id === 'oxford_iiit_pet') {
+    return [
+      'def load_dataset():',
+      "    transform = transforms.Compose([transforms.Resize((128, 128)), transforms.ToTensor()])",
+      "    train_split = datasets.OxfordIIITPet(root='./data/oxford_iiit_pet', split='trainval', download=True, transform=transform)",
+      "    test_split = datasets.OxfordIIITPet(root='./data/oxford_iiit_pet', split='test', download=True, transform=transform)",
+      '    source_dataset = ConcatDataset([train_split, test_split])',
+      '    labels = torch.tensor(list(train_split._labels) + list(test_split._labels), dtype=torch.long)',
+      '    return source_dataset, labels',
+    ];
+  }
+
+  if (dataset.id === 'flowers102') {
+    return [
+      'def load_dataset():',
+      "    transform = transforms.Compose([transforms.Resize((128, 128)), transforms.ToTensor()])",
+      "    train_split = datasets.Flowers102(root='./data/flowers102', split='train', download=True, transform=transform)",
+      "    val_split = datasets.Flowers102(root='./data/flowers102', split='val', download=True, transform=transform)",
+      "    test_split = datasets.Flowers102(root='./data/flowers102', split='test', download=True, transform=transform)",
+      '    source_dataset = ConcatDataset([train_split, val_split, test_split])',
+      '    labels = torch.tensor(list(train_split._labels) + list(val_split._labels) + list(test_split._labels), dtype=torch.long)',
+      '    return source_dataset, labels',
+    ];
+  }
+
   return [
     'def build_dataloaders():',
     `    raise ValueError("Unsupported dataset: ${dataset.id}")`,
@@ -117,7 +142,13 @@ function buildDatasetLoaderLines(dataset: DatasetItem) {
 }
 
 function usesStratifiedSplit(dataset: DatasetItem) {
-  return dataset.id === 'mnist' || dataset.id === 'fashion_mnist' || dataset.id === 'cifar10';
+  return (
+    dataset.id === 'mnist' ||
+    dataset.id === 'fashion_mnist' ||
+    dataset.id === 'cifar10' ||
+    dataset.id === 'oxford_iiit_pet' ||
+    dataset.id === 'flowers102'
+  );
 }
 
 export function generateModelCode(

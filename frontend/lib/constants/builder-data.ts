@@ -127,6 +127,81 @@ export const datasets: DatasetItem[] = [
   },
 ];
 
+export const competitionDatasets: DatasetItem[] = [
+  ...datasets,
+  {
+    id: 'imagenet',
+    icon: 'chip',
+    label: 'Tiny ImageNet Competition',
+    inputShape: '3 x 64 x 64',
+    records: '100K train / hidden public-private eval',
+    domain: 'Competition classification',
+    classCount: 200,
+    descriptionKo:
+      '축소된 ImageNet 스타일 데이터셋입니다. 더 많은 클래스와 복잡한 이미지로 경쟁형 분류 실험을 할 수 있습니다.',
+    shapeDescriptionKo: '입력 텐서 형태는 RGB 3채널 64x64 이미지입니다.',
+    classesDescriptionKo: '클래스는 총 200개입니다.',
+  },
+  {
+    id: 'oxford_iiit_pet',
+    icon: 'chip',
+    label: 'Oxford-IIIT Pet',
+    inputShape: '3 x 128 x 128',
+    records: '7,349 samples',
+    domain: 'Pet breed classification',
+    classCount: 37,
+    descriptionKo:
+      '고양이와 강아지 품종을 구분하는 컬러 이미지 데이터셋입니다. 중간 규모의 분류 경쟁 문제로 쓰기 좋습니다.',
+    shapeDescriptionKo: '입력 텐서 형태는 RGB 3채널 128x128 이미지입니다.',
+    classesDescriptionKo: '클래스는 총 37개이며 반려동물 품종 분류 문제입니다.',
+    infoSampleClasses: [
+      { label: 'Abyssinian', imageSrc: '/dataset-samples/oxford_pet/abyssinian.svg' },
+      { label: 'Beagle', imageSrc: '/dataset-samples/oxford_pet/beagle.svg' },
+      { label: 'Persian', imageSrc: '/dataset-samples/oxford_pet/persian.svg' },
+      { label: 'Pomeranian', imageSrc: '/dataset-samples/oxford_pet/pomeranian.svg' },
+      { label: 'Siamese', imageSrc: '/dataset-samples/oxford_pet/siamese.svg' },
+      { label: 'Shiba Inu', imageSrc: '/dataset-samples/oxford_pet/shiba.svg' },
+    ],
+    sampleClasses: [
+      { label: 'Abyssinian', imageSrc: '/dataset-samples/oxford_pet/abyssinian.svg' },
+      { label: 'Beagle', imageSrc: '/dataset-samples/oxford_pet/beagle.svg' },
+      { label: 'Persian', imageSrc: '/dataset-samples/oxford_pet/persian.svg' },
+      { label: 'Pomeranian', imageSrc: '/dataset-samples/oxford_pet/pomeranian.svg' },
+      { label: 'Siamese', imageSrc: '/dataset-samples/oxford_pet/siamese.svg' },
+      { label: 'Shiba Inu', imageSrc: '/dataset-samples/oxford_pet/shiba.svg' },
+    ],
+  },
+  {
+    id: 'flowers102',
+    icon: 'chip',
+    label: 'Flowers102',
+    inputShape: '3 x 128 x 128',
+    records: '8,189 samples',
+    domain: 'Flower classification',
+    classCount: 102,
+    descriptionKo:
+      '꽃 이미지를 102개 품종으로 분류하는 컬러 이미지 데이터셋입니다. 클래스 수가 많아 competition용으로 적합합니다.',
+    shapeDescriptionKo: '입력 텐서 형태는 RGB 3채널 128x128 이미지입니다.',
+    classesDescriptionKo: '클래스는 총 102개이며 꽃 품종 분류 문제입니다.',
+    infoSampleClasses: [
+      { label: 'Daisy', imageSrc: '/dataset-samples/flowers102/daisy.svg' },
+      { label: 'Sunflower', imageSrc: '/dataset-samples/flowers102/sunflower.svg' },
+      { label: 'Tulip', imageSrc: '/dataset-samples/flowers102/tulip.svg' },
+      { label: 'Lotus', imageSrc: '/dataset-samples/flowers102/lotus.svg' },
+      { label: 'Rose', imageSrc: '/dataset-samples/flowers102/rose.svg' },
+      { label: 'Iris', imageSrc: '/dataset-samples/flowers102/iris.svg' },
+    ],
+    sampleClasses: [
+      { label: 'Daisy', imageSrc: '/dataset-samples/flowers102/daisy.svg' },
+      { label: 'Sunflower', imageSrc: '/dataset-samples/flowers102/sunflower.svg' },
+      { label: 'Tulip', imageSrc: '/dataset-samples/flowers102/tulip.svg' },
+      { label: 'Lotus', imageSrc: '/dataset-samples/flowers102/lotus.svg' },
+      { label: 'Rose', imageSrc: '/dataset-samples/flowers102/rose.svg' },
+      { label: 'Iris', imageSrc: '/dataset-samples/flowers102/iris.svg' },
+    ],
+  },
+];
+
 export const libraryBlocks: LibraryBlock[] = [
   {
     id: 'linear',

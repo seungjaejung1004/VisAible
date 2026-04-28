@@ -24,7 +24,10 @@ export async function getLearningChapter(chapterId: string) {
   return apiClient<LearningChapterContent>(`/learning/chapters/${chapterId}`);
 }
 
-export function getLearningChapterPdfUrl(chapterId: string) {
+export function getLearningChapterPdfUrl(chapterId: string, sourceUrl?: string | null) {
+  if (sourceUrl?.startsWith('/')) {
+    return sourceUrl;
+  }
   return buildApiUrl(`/learning/chapters/${chapterId}/pdf`);
 }
 

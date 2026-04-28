@@ -1,5 +1,10 @@
 import { apiClient } from '@/lib/api/client';
-import type { StockPlaygroundNode, StockPreset, StockTrainingResult } from '@/types/builder';
+import type {
+  StockPlaygroundNode,
+  StockPredictionResult,
+  StockPreset,
+  StockTrainingResult,
+} from '@/types/builder';
 
 export async function getStockPresets() {
   return apiClient<StockPreset[]>('/stocks/presets');
@@ -9,6 +14,10 @@ export async function searchStocks(query: string) {
   return apiClient<StockPreset[]>('/stocks/search', {
     query: { query },
   });
+}
+
+export async function getStockPrediction(ticker: string) {
+  return apiClient<StockPredictionResult>(`/stocks/predict/${ticker}`);
 }
 
 export async function trainStockModel(payload: {

@@ -1056,6 +1056,12 @@ export function Canvas({
                         ? node.type === tutorialTargetNodeType &&
                           nodeOccurrenceIndex === (tutorialTargetNodeOccurrence ?? 0)
                         : tutorialTargetFieldName && node.type === 'linear' && index === nodes.length - 1;
+                      const isActivationTargetNode = tutorialTargetActivationName
+                        ? tutorialTargetNodeType
+                          ? node.type === tutorialTargetNodeType &&
+                            nodeOccurrenceIndex === (tutorialTargetNodeOccurrence ?? 0)
+                          : node.type === 'linear' && index === nodes.length - 1
+                        : false;
                       const isSecondaryTargetNode = tutorialSecondaryTargetNodeType
                         ? node.type === tutorialSecondaryTargetNodeType &&
                           nodeOccurrenceIndex === (tutorialSecondaryTargetNodeOccurrence ?? 0)
@@ -1093,7 +1099,7 @@ export function Canvas({
                             : undefined
                       }
                       tutorialTargetActivationName={
-                        isPrimaryTargetNode
+                        isActivationTargetNode
                           ? tutorialTargetActivationName ?? undefined
                           : undefined
                       }

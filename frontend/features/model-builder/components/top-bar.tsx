@@ -19,11 +19,11 @@ export function TopBar({
   onLogoClick,
 }: TopBarProps) {
   const workspaceTabs = [
+    { id: 'playground', label: 'Playground' },
+    { id: 'learning', label: 'Docs' },
     { id: 'tutorial', label: 'Tutorial' },
     { id: 'builder', label: 'Lab' },
-    { id: 'competition', label: 'Competition' },
-    { id: 'playground', label: 'Playground' },
-    { id: 'learning', label: 'Learning' },
+    { id: 'competition', label: 'Compeition' },
   ] as const;
 
   return (

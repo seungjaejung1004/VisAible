@@ -11,6 +11,7 @@ from app.schemas.mina import MinaChatRequest
 
 
 _GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+_GATEWAY_DEFAULT_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway"
 _LOCAL_ENV_PATH = Path(__file__).resolve().parents[2] / ".env.local"
 _GEMMA_DIR = Path(__file__).resolve().parents[3] / "gemma4"
 
@@ -39,6 +40,14 @@ def _truncate_text(value: str, limit: int) -> str:
     if len(normalized) <= limit:
         return normalized
     return normalized[: max(0, limit - 3)] + "..."
+
+
+def _read_env_or_local(*keys: str) -> str | None:
+    for key in keys:
+        value = os.getenv(key) or _read_local_env_value(key)
+        if value:
+            return value
+    return None
 
 
 def _build_node_details(payload: MinaChatRequest) -> str:
@@ -106,12 +115,7 @@ def _build_system_instruction(payload: MinaChatRequest) -> str:
 
 
 def _gemini_api_key() -> str:
-    api_key = (
-        os.getenv("GOOGLE_API_KEY")
-        or os.getenv("GEMINI_API_KEY")
-        or _read_local_env_value("GOOGLE_API_KEY")
-        or _read_local_env_value("GEMINI_API_KEY")
-    )
+    api_key = _read_env_or_local("GOOGLE_API_KEY", "GEMINI_API_KEY")
     if not api_key:
         raise ValueError(
             "Gemini API key is not configured. Set GOOGLE_API_KEY or GEMINI_API_KEY in the backend environment or backend/.env.local."
@@ -120,11 +124,27 @@ def _gemini_api_key() -> str:
 
 
 def _gemini_model() -> str:
+    return _read_env_or_local("GEMINI_MODEL") or "gemini-3-flash-preview"
+
+
+def _gateway_api_key(*, required: bool = False) -> str | None:
+    api_key = _read_env_or_local("HAI_GPT_API_KEY", "MINDLOGIC_API_KEY", "FACTCHAT_API_KEY")
+    if required and not api_key:
+        raise ValueError(
+            "Gateway API key is not configured. Set HAI_GPT_API_KEY in the backend environment or backend/.env.local."
+        )
+    return api_key
+
+
+def _gateway_base_url() -> str:
     return (
-        os.getenv("GEMINI_MODEL")
-        or _read_local_env_value("GEMINI_MODEL")
-        or "gemini-3-flash-preview"
-    )
+        _read_env_or_local("HAI_GPT_BASE_URL", "MINDLOGIC_BASE_URL", "FACTCHAT_BASE_URL")
+        or _GATEWAY_DEFAULT_BASE_URL
+    ).rstrip("/")
+
+
+def _gateway_model() -> str:
+    return _read_env_or_local("HAI_GPT_MODEL", "MINDLOGIC_MODEL", "FACTCHAT_MODEL") or _gemini_model()
 
 
 def _gemma_model_path() -> Path:
@@ -253,6 +273,37 @@ def _extract_candidate_text(payload: dict[str, object]) -> str:
     return "\n".join(texts)
 
 
+def _extract_gateway_text(payload: dict[str, object]) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("Gateway did not return any choices")
+
+    first = choices[0]
+    if not isinstance(first, dict):
+        raise ValueError("Gateway returned an unexpected choice payload")
+
+    message = first.get("message")
+    if not isinstance(message, dict):
+        raise ValueError("Gateway returned an empty message payload")
+
+    content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            text = item.get("text")
+            if isinstance(text, str) and text.strip():
+                parts.append(text.strip())
+        if parts:
+            return "\n".join(parts)
+
+    raise ValueError("Gateway returned an empty response")
+
+
 def _gemini_generation_config(model: str, payload: MinaChatRequest, *, retry: bool = False) -> dict[str, object]:
     config: dict[str, object] = {
         "temperature": 0.2 if payload.requestKind == "improvement" else 0.35,
@@ -300,6 +351,113 @@ def _parse_response(raw_text: str) -> dict[str, object]:
         "answer": answer.strip(),
         "highlight": _normalize_highlight(parsed.get("highlight")),
     }
+
+
+def _gateway_error_detail(response: requests.Response) -> str:
+    try:
+        error_payload = response.json()
+    except ValueError:
+        return response.text.strip()
+
+    if isinstance(error_payload, dict):
+        error = error_payload.get("error")
+        if isinstance(error, dict):
+            message = error.get("message")
+            if isinstance(message, str):
+                return message
+        return str(error or error_payload)
+
+    return str(error_payload)
+
+
+def _post_gateway_chat_completion(
+    *,
+    model: str,
+    messages: list[dict[str, object]],
+    max_tokens: int,
+    temperature: float,
+    top_p: float | None = None,
+    timeout: int = 45,
+) -> requests.Response:
+    api_key = _gateway_api_key(required=True)
+    request_payload: dict[str, object] = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+    if top_p is not None:
+        request_payload["top_p"] = top_p
+
+    try:
+        return requests.post(
+            f"{_gateway_base_url()}/chat/completions/",
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            },
+            json=request_payload,
+            timeout=timeout,
+        )
+    except requests.RequestException as error:
+        raise ValueError(f"Gateway request failed: {error}") from error
+
+
+def _chat_with_gateway(payload: MinaChatRequest) -> dict[str, object]:
+    model = _gateway_model()
+    messages = [
+        {"role": "system", "content": _build_system_instruction(payload)},
+        {"role": "user", "content": _build_common_context(payload)},
+    ]
+
+    response = _post_gateway_chat_completion(
+        model=model,
+        messages=messages,
+        max_tokens=1200 if payload.requestKind == "improvement" else 900,
+        temperature=0.2 if payload.requestKind == "improvement" else 0.35,
+        top_p=0.85,
+    )
+
+    if response.status_code >= 400:
+        raise ValueError(
+            f"Gateway API returned {response.status_code}. {_gateway_error_detail(response)}".strip()
+        )
+
+    try:
+        response_payload = response.json()
+    except ValueError as error:
+        raise ValueError("Gateway returned non-JSON response") from error
+
+    raw_text = _extract_gateway_text(response_payload)
+
+    try:
+        return _parse_response(raw_text)
+    except Exception as error:
+        if not _is_structured_response_error(error):
+            raise
+
+    retry_response = _post_gateway_chat_completion(
+        model=model,
+        messages=[
+            {"role": "system", "content": _build_retry_system_instruction(payload)},
+            {"role": "user", "content": _build_common_context(payload)},
+        ],
+        max_tokens=1200,
+        temperature=0.2,
+        top_p=0.85,
+    )
+
+    if retry_response.status_code >= 400:
+        raise ValueError(
+            f"Gateway retry API returned {retry_response.status_code}. {_gateway_error_detail(retry_response)}".strip()
+        )
+
+    try:
+        retry_response_payload = retry_response.json()
+    except ValueError as error:
+        raise ValueError("Gateway retry returned non-JSON response") from error
+
+    return _parse_response(_extract_gateway_text(retry_response_payload))
 
 
 def _chat_with_gemini(payload: MinaChatRequest) -> dict[str, object]:
@@ -460,5 +618,8 @@ def _chat_with_gemma(payload: MinaChatRequest) -> dict[str, object]:
 def chat_with_mina(payload: MinaChatRequest) -> dict[str, object]:
     if payload.provider == "gemma":
         return _chat_with_gemma(payload)
+
+    if _gateway_api_key():
+        return _chat_with_gateway(payload)
 
     return _chat_with_gemini(payload)

@@ -149,6 +149,12 @@ const paths: Record<IconName, ReactNode> = {
       <circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" />
     </>
   ),
+  close: (
+    <>
+      <path d="M7 7 17 17" />
+      <path d="M17 7 7 17" />
+    </>
+  ),
   check: (
     <>
       <circle cx="12" cy="12" r="9" />

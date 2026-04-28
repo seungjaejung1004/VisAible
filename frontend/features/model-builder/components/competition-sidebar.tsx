@@ -70,11 +70,8 @@ export function CompetitionSidebar({
       <section className="rounded-[24px] border border-[#dbe5f1] bg-white px-4 py-4 shadow-[0_16px_34px_rgba(15,23,42,0.06)]">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
-              VisAible Competition
-            </div>
-            <div className="mt-1 font-display text-[22px] font-bold text-[#10213b]">{room.title}</div>
-            <div className="mt-2 text-[12px] font-semibold text-[#64748b]">
+            <div className="font-display text-[22px] font-bold text-[#10213b]">{room.title}</div>
+            <div className="mt-1.5 text-[12px] font-semibold text-[#64748b]">
               {`\uCC38\uAC00\uC790 ${room.participants.length}\uBA85 \u00B7 ${room.participantRole}`}
             </div>
           </div>

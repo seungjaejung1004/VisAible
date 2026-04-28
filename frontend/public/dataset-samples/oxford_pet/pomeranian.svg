@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#fff9f1"/>
+  <rect x="10" y="10" width="108" height="108" rx="18" fill="#ffe2bc"/>
+  <circle cx="64" cy="68" r="36" fill="#f7b55e"/>
+  <path d="M39 48l11-18 9 20M89 48L78 30l-9 20" fill="#ee9b31"/>
+  <circle cx="52" cy="67" r="5" fill="#10213b"/>
+  <circle cx="76" cy="67" r="5" fill="#10213b"/>
+  <path d="M58 82c4 4 8 4 12 0" stroke="#b56a18" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <text x="64" y="114" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#a1682c">Pomeranian</text>
+</svg>

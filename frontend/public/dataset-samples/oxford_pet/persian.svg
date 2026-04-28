@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="20" fill="#fff7fb"/>
+  <rect x="10" y="10" width="108" height="108" rx="18" fill="#f6dff0"/>
+  <circle cx="64" cy="66" r="34" fill="#f5f1f6"/>
+  <path d="M38 49l10-18 8 18M90 49L80 31l-8 18" fill="#e7ddeb"/>
+  <circle cx="52" cy="66" r="5" fill="#10213b"/>
+  <circle cx="76" cy="66" r="5" fill="#10213b"/>
+  <circle cx="64" cy="77" r="5" fill="#e98ea7"/>
+  <path d="M58 86c4 2 8 2 12 0" stroke="#b95b79" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <text x="64" y="114" text-anchor="middle" font-size="12" font-family="Arial" font-weight="700" fill="#92668a">Persian</text>
+</svg>

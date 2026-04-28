@@ -1,8 +1,10 @@
 import gzip
 import os
+import ssl
 import shutil
 import tarfile
 import zipfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,6 +36,8 @@ DATA_ROOT = Path(__file__).resolve().parents[2] / "data"
 MNIST_DATA_DIR = DATA_ROOT / "mnist"
 CIFAR10_DATA_DIR = DATA_ROOT / "cifar10"
 TINY_IMAGENET_DIR = DATA_ROOT / "tiny-imagenet-200"
+OXFORD_PET_DATA_DIR = DATA_ROOT / "oxford_iiit_pet"
+FLOWERS102_DATA_DIR = DATA_ROOT / "flowers102"
 
 DATASET_DEFINITIONS = [
     DatasetDefinition(
@@ -63,6 +67,20 @@ DATASET_DEFINITIONS = [
         input_shape="3 x 64 x 64",
         records="100K train / 10K val",
         domain="Compact ImageNet-style classification",
+    ),
+    DatasetDefinition(
+        id="oxford_iiit_pet",
+        label="Oxford-IIIT Pet",
+        input_shape="3 x 128 x 128",
+        records="7,349 samples",
+        domain="Pet breed classification",
+    ),
+    DatasetDefinition(
+        id="flowers102",
+        label="Flowers102",
+        input_shape="3 x 128 x 128",
+        records="8,189 samples",
+        domain="Flower classification",
     ),
 ]
 
@@ -95,6 +113,20 @@ DATASET_SPECS: dict[str, DatasetRuntimeSpec] = {
         input_width=64,
         num_classes=200,
     ),
+    "oxford_iiit_pet": DatasetRuntimeSpec(
+        definition=DATASET_DEFINITIONS[4],
+        input_channels=3,
+        input_height=128,
+        input_width=128,
+        num_classes=37,
+    ),
+    "flowers102": DatasetRuntimeSpec(
+        definition=DATASET_DEFINITIONS[5],
+        input_channels=3,
+        input_height=128,
+        input_width=128,
+        num_classes=102,
+    ),
 }
 
 MNIST_FILES = {
@@ -118,6 +150,16 @@ def _build_direct_session() -> requests.Session:
     # Ignore broken system proxy settings when downloading public dataset assets.
     session.trust_env = False
     return session
+
+
+@contextmanager
+def allow_unverified_ssl():
+    original = ssl._create_default_https_context
+    ssl._create_default_https_context = ssl._create_unverified_context
+    try:
+        yield
+    finally:
+        ssl._create_default_https_context = original
 
 
 def ensure_mnist_downloaded() -> dict[str, object]:

@@ -4,7 +4,6 @@ import Image from 'next/image';
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/features/model-builder/components/icons';
-import { searchStocks } from '@/lib/api/stocks';
 import { datasets, libraryBlocks } from '@/lib/constants/builder-data';
 import { stockPlaygroundPresets } from '@/lib/constants/stock-playground';
 import type { BlockAccent, BlockType, DatasetItem, StockPreset, WorkspaceMode, PlaygroundMode } from '@/types/builder';
@@ -164,15 +163,13 @@ export function Sidebar({
   onBlockDragStart,
   onBlockDragEnd,
 }: SidebarProps) {
+  const isRpsPlayground = activeWorkspace === 'playground' && playgroundMode === 'rps';
   const [hoveredDatasetId, setHoveredDatasetId] = useState<string | null>(null);
   const [isCompetitionDatasetOpen, setIsCompetitionDatasetOpen] = useState(false);
   const [activeGuideBlockId, setActiveGuideBlockId] = useState<BlockType | null>(null);
   const [openedTutorialLessonId, setOpenedTutorialLessonId] = useState<string | null>(
     selectedTutorialLessonId,
   );
-  const [stockSearchQuery, setStockSearchQuery] = useState('');
-  const [stockSearchResults, setStockSearchResults] = useState<StockPreset[]>(stockPlaygroundPresets);
-  const [stockSearchBusy, setStockSearchBusy] = useState(false);
   const hoveredDataset =
     datasets.find((dataset) => dataset.id === hoveredDatasetId) ?? null;
   const activeTutorialLesson =
@@ -195,55 +192,16 @@ export function Sidebar({
     selectedStock ?? stockPlaygroundPresets[0];
 
   useEffect(() => {
-    if (activeWorkspace !== 'playground') {
-      return;
-    }
-
-    const query = stockSearchQuery.trim();
-    if (!query) {
-      setStockSearchResults(stockPlaygroundPresets);
-      setStockSearchBusy(false);
-      return;
-    }
-
-    let active = true;
-    setStockSearchBusy(true);
-    const timer = window.setTimeout(() => {
-      void searchStocks(query)
-        .then((results) => {
-          if (!active) {
-            return;
-          }
-          setStockSearchResults(results);
-        })
-        .catch(() => {
-          if (!active) {
-            return;
-          }
-          const lowered = query.toLowerCase();
-          setStockSearchResults(
-            stockPlaygroundPresets.filter((item) =>
-              [item.ticker, item.label, item.sector].some((value) =>
-                value.toLowerCase().includes(lowered),
-              ),
-            ),
-          );
-        })
-        .finally(() => {
-          if (active) {
-            setStockSearchBusy(false);
-          }
-        });
-    }, 280);
-
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [activeWorkspace, stockSearchQuery]);
+    setOpenedTutorialLessonId(selectedTutorialLessonId);
+  }, [selectedTutorialLessonId]);
 
   return (
-    <aside className="ui-surface relative z-10 flex h-full min-w-0 flex-col gap-4 overflow-hidden px-5 py-5">
+    <aside
+      className={[
+        'ui-surface relative z-10 self-start flex min-w-0 flex-col gap-4 overflow-hidden px-5 py-5 lg:overflow-visible',
+        isRpsPlayground ? 'h-auto' : 'h-full',
+      ].join(' ')}
+    >
       {activeWorkspace === 'builder' ? (
         <section className="grid gap-2.5">
           <h2 className="ui-section-title">Dataset Selection</h2>
@@ -316,15 +274,6 @@ export function Sidebar({
               </button>
             ))}
 
-            {activeTutorialLesson && activeTutorialDataset && (
-              <FloatingInfoPanel interactive>
-                <TutorialLessonPanel
-                  lesson={activeTutorialLesson}
-                  dataset={activeTutorialDataset}
-                  onClose={() => setOpenedTutorialLessonId(null)}
-                />
-              </FloatingInfoPanel>
-            )}
           </div>
         </section>
       ) : null}
@@ -335,10 +284,7 @@ export function Sidebar({
             Classroom
           </h2>
           <div className="rounded-[22px] bg-white px-4 py-4 shadow-[0_12px_28px_rgba(13,27,51,0.06)] shadow-[inset_0_0_0_1px_rgba(129,149,188,0.12)]">
-            <div className="ui-label">
-              Selected Dataset
-            </div>
-            <div className="mt-2 font-display text-[16px] font-bold leading-[1.2] text-ink">
+            <div className="font-display text-[16px] font-bold leading-[1.2] text-ink">
               {selectedDataset.label}
             </div>
             <div className="mt-2 text-[13px] font-semibold text-[#60708b]">
@@ -398,22 +344,8 @@ export function Sidebar({
           {playgroundMode === 'stock' ? (
             <div className="grid gap-3">
               <h2 className="ui-section-title">Stock Prediction</h2>
-              <label className="rounded-[20px] border border-[#d9e2ef] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(13,27,51,0.04)]">
-                <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#70819a]">
-                  Search Ticker
-                </div>
-                <input
-                  value={stockSearchQuery}
-                  onChange={(event) => setStockSearchQuery(event.target.value)}
-                  placeholder="AAPL, Tesla, AMD..."
-                  className="mt-2 w-full border-none bg-transparent font-display text-[18px] font-bold text-[#10213b] outline-none placeholder:font-semibold placeholder:text-[#9badc3]"
-                />
-                <div className="mt-2 text-[11px] font-semibold text-[#7386a3]">
-                  {stockSearchBusy ? '검색 중...' : '티커 또는 회사명으로 검색해서 바로 학습할 수 있습니다.'}
-                </div>
-              </label>
               <div className="grid gap-2 min-w-0">
-                {stockSearchResults.map((preset) => {
+                {stockPlaygroundPresets.map((preset) => {
                   const active = preset.ticker === selectedStockPreset?.ticker;
                   return (
                     <button
@@ -443,57 +375,30 @@ export function Sidebar({
                           <div className="mt-1 truncate text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#6a7f9d]">
                             {preset.sector}
                           </div>
-                          <div className="mt-2 overflow-hidden break-words text-[12px] leading-5 text-[#5b6c84]">
-                            {preset.description}
-                          </div>
                         </span>
                       </div>
                     </button>
                   );
                 })}
-                {!stockSearchResults.length && !stockSearchBusy && (
-                  <div className="rounded-[18px] border border-dashed border-[#d9e2ef] px-4 py-4 text-[12px] leading-5 text-[#6b809d]">
-                    검색 결과가 없습니다. 티커 기호를 정확히 입력해 보세요.
-                  </div>
-                )}
               </div>
-
-              {selectedStockPreset && (
-                <div className="rounded-[22px] border border-[#d9e2ef] bg-[linear-gradient(180deg,#ffffff,#f8fbff)] px-4 py-4 shadow-[0_10px_24px_rgba(13,27,51,0.04)]">
-                  <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#70819a]">
-                    Selected Ticker
-                  </div>
-                  <div className="mt-2 font-display text-[20px] font-bold text-[#10213b]">
-                    {selectedStockPreset.ticker}
-                  </div>
-                  <div className="mt-1 break-words text-[13px] font-semibold text-[#4d607d]">
-                    {selectedStockPreset.label}
-                  </div>
-                  <div className="mt-3 break-words rounded-[16px] bg-[#f5f8ff] px-3.5 py-3 text-[12px] leading-5 text-[#5b6c84]">
-                    {selectedStockPreset.description}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               <h2 className="ui-section-title">Rock Paper Scissors</h2>
-              <div className="rounded-[22px] border border-primary/20 bg-primary/5 px-4 py-5 shadow-[0_12px_28px_rgba(17,81,255,0.06)]">
+              <div className="rounded-[20px] border border-primary/20 bg-primary/5 px-4 py-4 shadow-[0_10px_22px_rgba(17,81,255,0.06)]">
                 <div className="flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-[14px] bg-primary/10 text-primary">
+                  <div className="grid h-9 w-9 place-items-center rounded-[12px] bg-primary/10 text-primary">
                     <Icon name="rocket" className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-primary/80">
-                      Feature Active
-                    </div>
-                    <div className="mt-0.5 text-[15px] font-bold text-[#10213b]">
-                      실시간 가위바위보
-                    </div>
+                    <div className="text-[15px] font-bold text-[#10213b]">실시간 가위바위보</div>
+                    <div className="mt-0.5 text-[12px] text-[#5b6c84]">카메라만 켜면 바로 한 판</div>
                   </div>
                 </div>
-                <div className="mt-4 text-[13px] leading-6 text-[#5b6c84]">
-                  MediaPipe AI를 활용하여 실시간으로 손 모양을 인식합니다. 카운트다운에 맞춰 승부를 겨뤄보세요!
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold text-[#4d6486]">3초 카운트</span>
+                  <span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold text-[#4d6486]">손 모양 인식</span>
+                  <span className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-bold text-[#4d6486]">즉시 결과</span>
                 </div>
               </div>
             </div>
@@ -502,7 +407,7 @@ export function Sidebar({
       ) : null}
 
       {activeWorkspace !== 'playground' && (
-        <section className="sticky top-4 grid w-full content-start gap-2 self-stretch">
+        <section className="grid w-full content-start gap-2 self-stretch lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
           <h2 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#7f8ea6]">
             Block Library
           </h2>
@@ -1403,6 +1308,10 @@ function DatasetDetailPanel({
   largeSamples?: boolean;
   onClose?: () => void;
 }) {
+  const sampleCards = dataset.infoSampleClasses ?? dataset.sampleClasses ?? [];
+  const photoSampleDatasetIds = new Set(['cifar10', 'imagenet', 'oxford_iiit_pet', 'flowers102']);
+  const usePhotoCover = photoSampleDatasetIds.has(dataset.id);
+
   return (
     <div
       className={[
@@ -1444,13 +1353,13 @@ function DatasetDetailPanel({
         <p>{dataset.classesDescriptionKo}</p>
       </div>
 
-      {(dataset.infoSampleClasses ?? dataset.sampleClasses)?.length ? (
+      {sampleCards.length ? (
         <div className={largeSamples ? 'mt-5' : 'mt-3'}>
           <div className={largeSamples ? 'mb-3 text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted' : 'mb-2 text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted'}>
             Class Samples
           </div>
-          <div className={largeSamples ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-2 gap-2'}>
-            {(dataset.infoSampleClasses ?? dataset.sampleClasses ?? []).map((sample) => (
+          <div className={largeSamples ? 'grid grid-cols-2 gap-3 xl:grid-cols-3' : 'grid grid-cols-2 gap-2'}>
+            {sampleCards.map((sample) => (
               <div
                 key={`${dataset.id}-${sample.label}`}
                 className={[
@@ -1470,7 +1379,7 @@ function DatasetDetailPanel({
                       alt={`${dataset.label} ${sample.label}`}
                       fill
                       unoptimized
-                      className={largeSamples ? 'object-contain p-2' : 'object-cover'}
+                      className={largeSamples ? (usePhotoCover ? 'object-cover' : 'object-contain p-2') : 'object-cover'}
                     />
                   </div>
                 ) : (

@@ -95,3 +95,45 @@ class StockTrainingResponse(BaseModel):
     backtest: list[StockBacktestPoint]
     forecast: list[StockForecastPoint]
     metrics: StockTrainingMetrics
+
+
+class StockPredictionPoint(BaseModel):
+    date: str
+    close: float
+
+
+class StockPredictionSignal(BaseModel):
+    label: str
+    value: str
+    tone: str
+
+
+class StockPredictionMetrics(BaseModel):
+    latestClose: float
+    predictedClose: float
+    predictedChangePct: float
+    confidence: int
+    recentChangePct: float
+    monthlyLow: float
+    monthlyHigh: float
+    volatilityPct: float
+    rangeLow: float
+    rangeHigh: float
+
+
+class StockPredictionResponse(BaseModel):
+    ticker: str
+    companyName: str
+    sector: str
+    period: str
+    modelLabel: str
+    generatedAt: str
+    latestDate: str
+    predictedDate: str
+    direction: str
+    summary: str
+    reasons: list[str]
+    history: list[StockPredictionPoint]
+    forecast: list[StockPredictionPoint]
+    signals: list[StockPredictionSignal]
+    metrics: StockPredictionMetrics

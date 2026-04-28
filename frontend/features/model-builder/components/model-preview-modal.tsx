@@ -52,8 +52,8 @@ type LinearScale = {
   max: number;
 };
 
-const LAYER_VISUAL_HEIGHT = 220;
-const LAYER_PRE_VISUAL_OFFSET = 148;
+const LAYER_VISUAL_HEIGHT = 188;
+const LAYER_PRE_VISUAL_OFFSET = 132;
 const CONNECTOR_AXIS_OFFSET = LAYER_PRE_VISUAL_OFFSET + LAYER_VISUAL_HEIGHT / 2 - 12;
 
 function fieldValue(node: CanvasNode, label: string, fallback: string) {
@@ -66,6 +66,8 @@ function parseDatasetRuntime(dataset: DatasetItem): DatasetRuntimePreview {
     fashion_mnist: 10,
     cifar10: 10,
     imagenet: 200,
+    oxford_iiit_pet: 37,
+    flowers102: 102,
   };
 
   const rawShape = dataset.inputShape?.split('x').map((item) => Number(item.trim())) ?? [1, 1, 1];
@@ -670,10 +672,10 @@ function chunkSteps<T>(items: T[], size: number): T[][] {
 
 function SchematicConnector() {
   return (
-    <div className="flex w-[26px] shrink-0 items-center justify-center">
-      <div className="relative h-[8px] w-full rounded-full bg-[rgba(129,149,188,0.16)]">
-        <div className="absolute inset-y-[1px] left-[2px] right-[10px] rounded-full bg-[linear-gradient(90deg,#9fb9ff,#5f84ff)] shadow-[0_0_16px_rgba(95,132,255,0.35)]" />
-        <div className="absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 rotate-45 rounded-[2px] border-r-[2px] border-t-[2px] border-[#5f84ff] bg-transparent" />
+    <div className="flex w-[22px] shrink-0 items-center justify-center">
+      <div className="relative h-[7px] w-full rounded-full bg-[rgba(129,149,188,0.16)]">
+        <div className="absolute inset-y-[1px] left-[2px] right-[9px] rounded-full bg-[linear-gradient(90deg,#9fb9ff,#5f84ff)] shadow-[0_0_14px_rgba(95,132,255,0.28)]" />
+        <div className="absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 rotate-45 rounded-[2px] border-r-[2px] border-t-[2px] border-[#5f84ff] bg-transparent" />
       </div>
     </div>
   );
@@ -696,13 +698,13 @@ function SchematicFigure({
   const linearDimensions = step.kind === 'linear'
     ? linearFigureDimensions(linearFeatures, 'schematic', linearScale)
     : null;
-  const frameWidth = Math.min(72, Math.max(36, 18 + Math.sqrt(spatialWidth) * 8 + Math.log2(channels + 1) * 6));
-  const frameHeight = Math.min(62, Math.max(30, 14 + Math.sqrt(spatialHeight) * 7));
-  const cnnDepth = Math.max(3, Math.min(7, Math.ceil(Math.log2(channels + 1) / 1.05)));
+  const frameWidth = Math.min(68, Math.max(34, 16 + Math.sqrt(spatialWidth) * 7.4 + Math.log2(channels + 1) * 5.4));
+  const frameHeight = Math.min(58, Math.max(28, 13 + Math.sqrt(spatialHeight) * 6.2));
+  const cnnDepth = Math.max(3, Math.min(6, Math.ceil(Math.log2(channels + 1) / 1.1)));
   const cnnOffsetX = Math.max(4, Math.min(9, 3 + Math.log2(channels + 1) * 1.1));
   const cnnOffsetY = Math.max(3, Math.min(8, 2 + Math.log2(channels + 1) * 0.95));
-  const cnnFrontWidth = Math.max(32, Math.min(74, 14 + Math.sqrt(spatialWidth) * 8 + Math.log2(channels + 1) * 3.2));
-  const cnnFrontHeight = Math.max(28, Math.min(64, 14 + Math.sqrt(spatialHeight) * 8));
+  const cnnFrontWidth = Math.max(30, Math.min(68, 13 + Math.sqrt(spatialWidth) * 7.2 + Math.log2(channels + 1) * 2.9));
+  const cnnFrontHeight = Math.max(26, Math.min(58, 13 + Math.sqrt(spatialHeight) * 7.2));
   const cnnVisualWidth = cnnFrontWidth + (cnnDepth - 1) * cnnOffsetX;
   const cnnVisualHeight = cnnFrontHeight + (cnnDepth - 1) * cnnOffsetY;
   const title = compactStepTitle(step, 'schematic');
@@ -782,10 +784,10 @@ function SchematicFigure({
   }
 
   return (
-    <div className="grid min-w-0 flex-1 justify-items-center" style={{ gridTemplateRows: '18px 122px 22px' }}>
-      <div className="text-[10px] font-black uppercase tracking-[0.16em] text-[#203152]">{title}</div>
+    <div className="grid min-w-0 flex-1 justify-items-center" style={{ gridTemplateRows: '20px 104px 24px' }}>
+      <div className="text-[11px] font-black uppercase tracking-[0.1em] text-[#203152]">{title}</div>
       <div className="flex h-full items-center justify-center">{visual}</div>
-      <div className="rounded-full bg-white/90 px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#4d6287] shadow-[0_6px_18px_rgba(13,27,51,0.08)]">
+      <div className="rounded-full bg-white/92 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#4d6287] shadow-[0_6px_18px_rgba(13,27,51,0.08)]">
         {caption}
       </div>
     </div>
@@ -1155,7 +1157,7 @@ export function ModelPreviewModal({
   const density = getDiagramDensity(steps.length);
   const linearScale = getLinearScale(steps);
   const schematicRowSize =
-    steps.length <= 6 ? steps.length : steps.length >= 16 ? 5 : 6;
+    steps.length <= 5 ? steps.length : steps.length >= 14 ? 4 : steps.length >= 9 ? 5 : 6;
   const schematicRows = chunkSteps(steps, schematicRowSize);
 
   useEffect(() => {
@@ -1189,32 +1191,32 @@ export function ModelPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[rgba(13,27,51,0.36)] backdrop-blur-sm"
+      className="fixed inset-0 z-[10020] bg-[rgba(13,27,51,0.36)] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="mx-auto mt-10 flex h-[calc(100vh-5rem)] w-[min(1220px,calc(100%-2rem))] flex-col overflow-hidden rounded-[32px] bg-white shadow-[0_30px_80px_rgba(13,27,51,0.22)]"
+        className="mx-auto mt-4 flex h-[calc(100vh-2rem)] w-[min(1140px,calc(100%-1.5rem))] flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_30px_80px_rgba(13,27,51,0.22)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line px-6 py-5">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div className="grid gap-1">
-            <strong className="font-display text-2xl font-bold text-ink">Model Preview</strong>
-            <span className="text-sm text-muted">Architecture and generated PyTorch code</span>
+            <strong className="font-display text-[28px] font-bold tracking-[-0.04em] text-ink">Model Preview</strong>
+            <span className="text-[13px] font-medium text-muted">아키텍처 흐름과 생성된 PyTorch 코드를 함께 봅니다</span>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="relative flex rounded-full bg-[#eef3ff] p-1.5 shadow-[inset_0_0_0_1px_rgba(129,149,188,0.12)]">
               <span
                 className={[
-                  'absolute top-1.5 h-[42px] w-[78px] rounded-full bg-white shadow-[0_10px_24px_rgba(17,81,255,0.16)] transition-transform duration-300',
-                  viewMode === 'architecture' ? 'translate-x-0' : 'translate-x-[86px]',
+                  'absolute top-1.5 h-[38px] w-[72px] rounded-full bg-white shadow-[0_10px_24px_rgba(17,81,255,0.16)] transition-transform duration-300',
+                  viewMode === 'architecture' ? 'translate-x-0' : 'translate-x-[80px]',
                 ].join(' ')}
               />
               <button
                 type="button"
                 onClick={() => setViewMode('architecture')}
                 className={[
-                  'relative z-10 flex h-[42px] w-[78px] items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.18em] transition-colors',
+                  'relative z-10 flex h-[38px] w-[72px] items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.12em] transition-colors',
                   viewMode === 'architecture' ? 'text-primary' : 'text-muted',
                 ].join(' ')}
               >
@@ -1224,7 +1226,7 @@ export function ModelPreviewModal({
                 type="button"
                 onClick={() => setViewMode('code')}
                 className={[
-                  'relative z-10 ml-2 flex h-[42px] w-[78px] items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.18em] transition-colors',
+                  'relative z-10 ml-2 flex h-[38px] w-[72px] items-center justify-center rounded-full text-[11px] font-extrabold uppercase tracking-[0.12em] transition-colors',
                   viewMode === 'code' ? 'text-primary' : 'text-muted',
                 ].join(' ')}
               >
@@ -1235,35 +1237,35 @@ export function ModelPreviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="grid h-11 w-11 place-items-center rounded-full bg-[#f2f5fb] text-2xl text-muted transition-colors hover:text-ink"
+              className="grid h-10 w-10 place-items-center rounded-full border border-[#ffd6df] bg-[#fff2f5] text-[#d34b6b] shadow-[0_8px_18px_rgba(211,75,107,0.12)] transition-colors hover:bg-[#ffe4ea] hover:text-[#b82f52]"
               aria-label="Close preview"
             >
-              ×
+              <Icon name="close" className="h-5.5 w-5.5" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto px-6 py-6">
+        <div className="flex-1 overflow-auto px-5 py-4">
           {viewMode === 'architecture' ? (
             <div className="min-w-0">
-              <section className="min-w-0 rounded-[28px] bg-[linear-gradient(180deg,#fdfdfe_0%,#f7f8fb_100%)] p-6 shadow-[inset_0_0_0_1px_rgba(129,149,188,0.12)]">
-                <div className="mb-4 flex items-center justify-between">
+              <section className="min-w-0 rounded-[24px] bg-[linear-gradient(180deg,#fdfdfe_0%,#f7f8fb_100%)] p-4 shadow-[inset_0_0_0_1px_rgba(129,149,188,0.12)]">
+                <div className="mb-3 flex items-center justify-between gap-4">
                   <div>
-                    <div className="font-display text-xl font-bold text-ink">Architecture Flow</div>
-                    <div className="text-sm text-muted">
-                      Scan left to right. Every layer stays in one canvas so the tensor flow is readable at a glance.
+                    <div className="font-display text-[22px] font-bold tracking-[-0.04em] text-ink">Architecture Flow</div>
+                    <div className="text-[13px] leading-5 text-muted">
+                      블록이 실제 모델 구조로 어떻게 이어지는지 한 화면에서 읽기 쉽게 정리했습니다.
                     </div>
                   </div>
-                  <div className="rounded-full border border-[rgba(129,149,188,0.14)] bg-white px-4 py-2 text-xs font-extrabold uppercase tracking-[0.16em] text-primary">
+                  <div className="rounded-full border border-[rgba(129,149,188,0.14)] bg-white px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.1em] text-primary">
                     {steps.length} Stages
                   </div>
                 </div>
 
-                <div className="rounded-[24px] border border-[rgba(129,149,188,0.14)] bg-[radial-gradient(circle_at_top,rgba(255,255,255,1),rgba(239,244,255,0.98))] px-4 py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                    <div className="grid gap-5 px-1 py-2">
+                <div className="rounded-[20px] border border-[rgba(129,149,188,0.14)] bg-[radial-gradient(circle_at_top,rgba(255,255,255,1),rgba(239,244,255,0.98))] px-3 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                    <div className="grid gap-4 px-1 py-1">
                       {schematicRows.map((row, rowIndex) => (
-                        <div key={`schematic-row-${rowIndex}`} className="grid gap-3">
-                          <div className="rounded-[20px] border border-[rgba(129,149,188,0.12)] bg-white/70 px-3 py-4 shadow-[0_20px_40px_rgba(13,27,51,0.04)] backdrop-blur-[2px]">
+                        <div key={`schematic-row-${rowIndex}`} className="grid gap-2.5">
+                          <div className="rounded-[18px] border border-[rgba(129,149,188,0.12)] bg-white/72 px-3 py-3 shadow-[0_18px_36px_rgba(13,27,51,0.04)] backdrop-blur-[2px]">
                             <div className="flex items-center gap-0">
                               {row.map((step, index) => (
                                 <div key={step.id} className="flex min-w-0 flex-1 items-center">
@@ -1276,7 +1278,7 @@ export function ModelPreviewModal({
                           {rowIndex !== schematicRows.length - 1 ? (
                             <div className="flex justify-center">
                               <div className="flex flex-col items-center gap-1 text-[#5f84ff]">
-                                <div className="h-6 w-[2px] rounded-full bg-[linear-gradient(180deg,rgba(95,132,255,0.2),rgba(95,132,255,0.75))]" />
+                                <div className="h-5 w-[2px] rounded-full bg-[linear-gradient(180deg,rgba(95,132,255,0.2),rgba(95,132,255,0.75))]" />
                                 <div className="h-3 w-3 rotate-45 border-b-[2px] border-r-[2px] border-[#5f84ff]" />
                               </div>
                             </div>
@@ -1286,7 +1288,7 @@ export function ModelPreviewModal({
                     </div>
                 </div>
 
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-[12px] text-muted">
+                <div className="mt-3 flex flex-wrap items-center gap-2.5 text-[13px] text-muted">
                   {[
                     { label: 'Input / reshape', accent: 'emerald' as const },
                     { label: 'Linear / classifier', accent: 'blue' as const },
@@ -1297,7 +1299,7 @@ export function ModelPreviewModal({
                     const colors = stepColors(item.accent, false);
                     return (
                       <span key={item.label} className="flex items-center gap-2">
-                        <i className={['h-3 w-3 rounded-[3px] border', colors.line, colors.panel].join(' ')} />
+                        <i className={['h-3.5 w-3.5 rounded-[3px] border', colors.line, colors.panel].join(' ')} />
                         {item.label}
                       </span>
                     );
@@ -1306,24 +1308,24 @@ export function ModelPreviewModal({
               </section>
             </div>
           ) : (
-            <section className="min-w-0 rounded-[28px] bg-[#0f172a] p-5 text-white shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)]">
+            <section className="min-w-0 rounded-[24px] bg-[#0f172a] p-4 text-white shadow-[inset_0_0_0_1px_rgba(148,163,184,0.18)]">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <strong className="font-display text-xl font-bold">Generated Code</strong>
-                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                  <strong className="font-display text-[22px] font-bold tracking-[-0.04em]">Generated Code</strong>
+                  <div className="mt-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-slate-300">
                     PyTorch
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => void handleCopyCode()}
-                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-extrabold uppercase tracking-[0.14em] text-slate-100 transition-colors hover:bg-white/16"
+                  className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[11px] font-extrabold uppercase tracking-[0.12em] text-slate-100 transition-colors hover:bg-white/16"
                 >
                   <Icon name="copy" className="h-3.5 w-3.5" />
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
-              <pre className="overflow-auto rounded-[18px] bg-black/20 p-4 text-[12px] leading-6 text-slate-100">
+              <pre className="overflow-auto rounded-[18px] bg-black/20 p-4 text-[13px] leading-6 text-slate-100">
                 <code>{modelCode}</code>
               </pre>
             </section>

@@ -20,7 +20,7 @@ export type DatasetItem = {
   classLabels?: string[];
 };
 
-export type WorkspaceMode = 'builder' | 'tutorial' | 'competition' | 'playground' | 'learning';
+export type WorkspaceMode = 'home' | 'builder' | 'tutorial' | 'competition' | 'playground' | 'learning';
 export type PlaygroundMode = 'stock' | 'rps';
 
 
@@ -161,7 +161,8 @@ export type IconName =
   | 'dropout'
   | 'copy'
   | 'flask'
-  | 'trophy';
+  | 'trophy'
+  | 'close';
 
 export type CompetitionParticipant = {
   id: number;
@@ -305,4 +306,46 @@ export type StockTrainingResult = {
   backtest: StockBacktestPoint[];
   forecast: StockForecastPoint[];
   metrics: StockTrainingMetrics;
+};
+
+export type StockPredictionPoint = {
+  date: string;
+  close: number;
+};
+
+export type StockPredictionSignal = {
+  label: string;
+  value: string;
+  tone: 'positive' | 'negative' | 'neutral';
+};
+
+export type StockPredictionMetrics = {
+  latestClose: number;
+  predictedClose: number;
+  predictedChangePct: number;
+  confidence: number;
+  recentChangePct: number;
+  monthlyLow: number;
+  monthlyHigh: number;
+  volatilityPct: number;
+  rangeLow: number;
+  rangeHigh: number;
+};
+
+export type StockPredictionResult = {
+  ticker: string;
+  companyName: string;
+  sector: string;
+  period: string;
+  modelLabel: string;
+  generatedAt: string;
+  latestDate: string;
+  predictedDate: string;
+  direction: 'up' | 'down' | 'flat';
+  summary: string;
+  reasons: string[];
+  history: StockPredictionPoint[];
+  forecast: StockPredictionPoint[];
+  signals: StockPredictionSignal[];
+  metrics: StockPredictionMetrics;
 };

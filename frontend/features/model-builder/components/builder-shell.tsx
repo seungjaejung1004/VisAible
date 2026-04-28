@@ -7,6 +7,7 @@ import { Canvas } from '@/features/model-builder/components/canvas';
 import { CompetitionPanel } from '@/features/model-builder/components/competition-panel';
 import { CompetitionRankModal } from '@/features/model-builder/components/competition-rank-modal';
 import { CompetitionSidebar } from '@/features/model-builder/components/competition-sidebar';
+import { HomeLanding } from '@/features/model-builder/components/home-landing';
 import { Icon } from '@/features/model-builder/components/icons';
 import { Inspector } from '@/features/model-builder/components/inspector';
 import { LearningWorkspace as LearningWorkspacePanel } from '@/features/model-builder/components/learning-workspace';
@@ -37,7 +38,7 @@ import {
   subscribeTrainingStatus,
 } from '@/lib/api/model-builder';
 import { defaultAugmentationParams } from '@/lib/constants/augmentations';
-import { datasets, libraryBlocks } from '@/lib/constants/builder-data';
+import { competitionDatasets, datasets, libraryBlocks } from '@/lib/constants/builder-data';
 import { stockPlaygroundPresets } from '@/lib/constants/stock-playground';
 import {
   batchSizeOptions,
@@ -62,17 +63,7 @@ import type {
   PlaygroundMode,
 } from '@/types/builder';
 
-const competitionDataset = {
-  id: 'imagenet',
-  icon: 'chip',
-  label: 'Tiny ImageNet Competition',
-  inputShape: '3 x 64 x 64',
-  records: '100K train / hidden public-private eval',
-  domain: 'Competition classification',
-  classCount: 200,
-} as const;
-
-const availableCompetitionDatasets = [...datasets, competitionDataset];
+const availableCompetitionDatasets = competitionDatasets;
 
 function formatCompetitionDateLabel(value?: string | null) {
   if (!value) {
@@ -356,7 +347,7 @@ function getWorkspaceSnapshotKey(
   workspace: WorkspaceMode,
   tutorialLessonId: string | null,
 ) {
-  return workspace === 'tutorial' ? `tutorial:${tutorialLessonId ?? 'mlp-1-1'}` : workspace;
+  return workspace === 'tutorial' ? `tutorial:${tutorialLessonId ?? 'unselected'}` : workspace;
 }
 
 function getDatasetTeachingConfig(
@@ -440,7 +431,8 @@ export function BuilderShell() {
   } = useBuilderBoard();
   const [selectedDatasetId, setSelectedDatasetId] = useState(datasets[0]?.id ?? 'mnist');
   const [selectedStock, setSelectedStock] = useState<StockPreset | null>(stockPlaygroundPresets[0] ?? null);
-  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceMode>('builder');
+  const [selectedLearningChapterId, setSelectedLearningChapterId] = useState<string | null>(null);
+  const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceMode>('home');
   const [playgroundMode, setPlaygroundMode] = useState<PlaygroundMode>('stock');
   const [optimizer, setOptimizer] = useState<OptimizerName>('AdamW');
   const [learningRate, setLearningRate] = useState(optimizerConfigs.AdamW.defaultLearningRate);
@@ -504,7 +496,7 @@ export function BuilderShell() {
   const [tutorialStep, setTutorialStep] = useState<TutorialStepKey>('story-intro');
   const [tutorialPredictionDone, setTutorialPredictionDone] = useState(false);
   const [isMnistMissionMinimized, setIsMnistMissionMinimized] = useState(false);
-  const [selectedTutorialLessonId, setSelectedTutorialLessonId] = useState<string | null>('mlp-1-1');
+  const [selectedTutorialLessonId, setSelectedTutorialLessonId] = useState<string | null>(null);
   const [lessonCoachStep, setLessonCoachStep] = useState<LessonCoachStep | null>(null);
   const [cnn11MissionRetryPending, setCnn11MissionRetryPending] = useState(false);
   const [cnn11BaselineChallengeSamples, setCnn11BaselineChallengeSamples] = useState<
@@ -523,11 +515,15 @@ export function BuilderShell() {
   const pollingRef = useRef<number | null>(null);
   const streamRef = useRef<EventSource | null>(null);
   const liveBatchKeyRef = useRef<string | null>(null);
+  const lastConsoleStatusRef = useRef<string | null>(null);
+  const lastConsoleStageRef = useRef<string | null>(null);
+  const lastConsoleBatchRef = useRef<string | null>(null);
   const competitionDatasetId = competitionRoom?.datasetId ?? 'imagenet';
   const selectedDataset =
     activeWorkspace === 'competition'
       ? (availableCompetitionDatasets.find((dataset) => dataset.id === competitionDatasetId) ??
-        competitionDataset)
+        availableCompetitionDatasets.find((dataset) => dataset.id === 'imagenet') ??
+        availableCompetitionDatasets[0])
       : (datasets.find((dataset) => dataset.id === selectedDatasetId) ?? datasets[0]);
   const runtimeDatasetId = activeWorkspace === 'competition' ? competitionDatasetId : selectedDatasetId;
   const showAugmentationPanel =
@@ -633,6 +629,65 @@ export function BuilderShell() {
       lessonCoachStep !== null ||
       tutorialStep === 'training-metrics-loss' ||
       tutorialStep === 'training-metrics-accuracy');
+  const logTrainingStatusToConsole = (result: TrainingJobStatus, source: 'stream' | 'poll') => {
+    const currentStatus = result.status ?? 'unknown';
+    const currentStage = result.stage ?? 'idle';
+    const currentBatch =
+      result.currentEpoch != null && result.currentBatch != null
+        ? `${result.currentEpoch}:${result.currentBatch}/${result.totalBatches ?? '?'}`
+        : null;
+
+    if (
+      lastConsoleStatusRef.current !== currentStatus ||
+      lastConsoleStageRef.current !== currentStage
+    ) {
+      console.info('[training]', {
+        source,
+        status: currentStatus,
+        stage: currentStage,
+        datasetId: result.datasetId ?? null,
+        epoch: result.currentEpoch ?? null,
+        batch: result.currentBatch ?? null,
+        totalBatches: result.totalBatches ?? null,
+      });
+      lastConsoleStatusRef.current = currentStatus;
+      lastConsoleStageRef.current = currentStage;
+    }
+
+    if (
+      currentStatus === 'running' &&
+      currentBatch &&
+      currentBatch !== lastConsoleBatchRef.current &&
+      result.currentBatch != null &&
+      (result.currentBatch === 1 ||
+        result.currentBatch === result.totalBatches ||
+        result.currentBatch % 10 === 0)
+    ) {
+      console.info('[training-batch]', {
+        source,
+        datasetId: result.datasetId ?? null,
+        epoch: result.currentEpoch ?? null,
+        batch: result.currentBatch,
+        totalBatches: result.totalBatches ?? null,
+        liveTrainLoss: result.liveTrainLoss ?? null,
+        liveTrainAccuracy: result.liveTrainAccuracy ?? null,
+        liveValidationLoss: result.liveValidationLoss ?? null,
+        liveValidationAccuracy: result.liveValidationAccuracy ?? null,
+      });
+      lastConsoleBatchRef.current = currentBatch;
+    }
+
+    if (currentStatus === 'completed' || currentStatus === 'failed' || currentStatus === 'stopped') {
+      console.info('[training-finished]', {
+        source,
+        status: currentStatus,
+        datasetId: result.datasetId ?? null,
+        bestValidationAccuracy: result.bestValidationAccuracy ?? null,
+        error: result.error ?? null,
+      });
+      lastConsoleBatchRef.current = null;
+    }
+  };
   const isCompetitionSetupVisible = activeWorkspace === 'competition' && !competitionRoom;
   const shouldResumeCnn11Mission =
     isCnn11TutorialActive &&
@@ -675,10 +730,57 @@ export function BuilderShell() {
       (isCnn11TutorialActive && shouldResumeCnn11Mission) ||
       (mnistQuestPhase && mnistQuestPhase !== 'intro' && isMnistMissionMinimized));
   const shellGridClassName = isCompetitionSetupVisible
-    ? 'mt-3 grid min-h-0 gap-3'
-    : activeWorkspace === 'playground' || activeWorkspace === 'learning'
-      ? 'mt-3 grid min-h-0 gap-3 lg:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:gap-4'
-      : 'mt-3 grid min-h-0 gap-3 lg:justify-center lg:grid-cols-[minmax(248px,0.64fr)_minmax(0,1.82fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(252px,14.5vw,296px)_minmax(0,1fr)_clamp(320px,22vw,468px)]';
+    ? 'mt-3 grid min-h-0 items-start gap-3'
+    : activeWorkspace === 'home'
+      ? 'mt-3 grid min-h-0 items-start gap-3'
+    : activeWorkspace === 'playground'
+      ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-4'
+      : activeWorkspace === 'learning'
+        ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:gap-4'
+      : 'mt-3 grid min-h-0 items-start gap-3 lg:justify-center lg:grid-cols-[minmax(248px,0.64fr)_minmax(0,1.82fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(252px,14.5vw,296px)_minmax(0,1fr)_clamp(320px,22vw,468px)]';
+  const handleWorkspaceSelect = (workspace: WorkspaceMode) => {
+    if (workspace === activeWorkspace) {
+      return;
+    }
+
+    saveWorkspaceSnapshot(activeWorkspace, selectedTutorialLessonId, selectedDatasetId);
+    clearTrainingUiState();
+    setActiveWorkspace(workspace);
+    setIsCompetitionInfoOpen(false);
+    setIsCompetitionRankOpen(false);
+    if (workspace !== 'tutorial') {
+      setTutorialGuideOpen(false);
+      setTutorialStep('story-intro');
+      setTutorialPredictionDone(false);
+      setIsMnistMissionMinimized(false);
+      setLessonCoachStep(null);
+      setCnn11BaselineChallengeSamples(null);
+    }
+
+    if (workspace === 'home') {
+      return;
+    }
+
+    if (workspace === 'builder') {
+      restoreWorkspaceSnapshot('builder', null, datasets[0]?.id ?? 'mnist');
+      return;
+    }
+
+    if (workspace === 'tutorial') {
+      setSelectedTutorialLessonId(null);
+      setTutorialGuideOpen(false);
+      setTutorialStep('story-intro');
+      setTutorialPredictionDone(false);
+      setIsMnistMissionMinimized(false);
+      setCnn11BaselineChallengeSamples(null);
+      setLessonCoachStep(null);
+      return;
+    }
+
+    if (workspace === 'playground' || workspace === 'learning') {
+      return;
+    }
+  };
 
   const tutorialOverlayCopy = useMemo(
     () =>
@@ -1978,6 +2080,9 @@ export function BuilderShell() {
       setLatestTrainingResult(null);
       setLiveHistory({ loss: [], accuracy: [], validationLoss: [], validationAccuracy: [] });
       liveBatchKeyRef.current = null;
+      lastConsoleStatusRef.current = null;
+      lastConsoleStageRef.current = null;
+      lastConsoleBatchRef.current = null;
       if (pollingRef.current !== null) {
         window.clearInterval(pollingRef.current);
         pollingRef.current = null;
@@ -1998,6 +2103,15 @@ export function BuilderShell() {
           nodes,
         });
         setCurrentJobId(jobId);
+        console.info('[training]', {
+          source: 'client',
+          status: 'start-requested',
+          datasetId: runtimeDatasetId,
+          jobId,
+          epochs: Number(epochs),
+          batchSize,
+          optimizer,
+        });
 
         let missingStatusRetries = 0;
         let usingPollingFallback = false;
@@ -2093,6 +2207,7 @@ export function BuilderShell() {
             missingStatusRetries = 0;
             setTrainingStatus(result);
             syncLiveHistory(result);
+            logTrainingStatusToConsole(result, 'poll');
 
             if (result.status === 'completed' || result.status === 'failed' || result.status === 'stopped') {
               finishTraining(result);
@@ -2122,6 +2237,7 @@ export function BuilderShell() {
           onMessage: (result) => {
             setTrainingStatus(result);
             syncLiveHistory(result);
+            logTrainingStatusToConsole(result, 'stream');
             if (result.status === 'running') {
               setIsTraining(true);
             }
@@ -2133,6 +2249,11 @@ export function BuilderShell() {
             if (usingPollingFallback) {
               return;
             }
+            console.warn('[training]', {
+              source: 'stream',
+              status: 'stream-error',
+              jobId,
+            });
             usingPollingFallback = true;
             stopStreaming();
             void pollStatus();
@@ -2228,63 +2349,22 @@ export function BuilderShell() {
     optimizerField == null
       ? 0
       : Math.max(0, optimizerField.values.indexOf(optimizerParams[optimizerField.key]));
+  const shellPaddingBottomClassName = isBottomActionVisible
+    ? 'pb-[15.5rem] xl:pb-[16.5rem]'
+    : 'pb-3 xl:pb-4';
 
   return (
-    <div className="min-h-screen px-3 py-3 pb-[15.5rem] xl:px-4 xl:py-4 xl:pb-[16.5rem]">
+    <div className={`min-h-screen px-3 py-3 xl:px-4 xl:py-4 ${shellPaddingBottomClassName}`}>
       <div className="mx-auto w-full max-w-[min(2320px,calc(100vw-8px))]">
         <TopBar
           activeWorkspace={activeWorkspace}
           trainingStatus={trainingStatus}
           isTraining={isTraining}
-          onWorkspaceSelect={(workspace) => {
-            if (workspace === activeWorkspace) {
-              return;
-            }
-
-            saveWorkspaceSnapshot(activeWorkspace, selectedTutorialLessonId, selectedDatasetId);
-            clearTrainingUiState();
-            setActiveWorkspace(workspace);
-            setIsCompetitionInfoOpen(false);
-            setIsCompetitionRankOpen(false);
-            if (workspace !== 'tutorial') {
-              setTutorialGuideOpen(false);
-              setTutorialStep('story-intro');
-              setTutorialPredictionDone(false);
-              setIsMnistMissionMinimized(false);
-              setLessonCoachStep(null);
-              setCnn11BaselineChallengeSamples(null);
-            }
-
-            if (workspace === 'builder') {
-              restoreWorkspaceSnapshot('builder', null, datasets[0]?.id ?? 'mnist');
-              return;
-            }
-
-            if (workspace === 'tutorial') {
-              const nextLessonId = selectedTutorialLessonId ?? 'mlp-1-1';
-              const lessonDatasetId = getTutorialLessonDatasetId(nextLessonId);
-              const hasSnapshot = restoreWorkspaceSnapshot('tutorial', nextLessonId, lessonDatasetId);
-              applyLessonTrainingDefaults(nextLessonId);
-              setTutorialGuideOpen(nextLessonId === 'mlp-1-1');
-              setCnn11BaselineChallengeSamples(null);
-              setLessonCoachStep(
-                nextLessonId === 'mlp-1-2'
-                  ? (hasSnapshot ? null : 'mlp12-intro')
-                  : nextLessonId === 'cnn-1-1'
-                    ? null
-                    : null,
-              );
-              return;
-            }
-
-            if (workspace === 'playground' || workspace === 'learning') {
-              return;
-            }
-          }}
+          onWorkspaceSelect={handleWorkspaceSelect}
           onLogoClick={() => {
             saveWorkspaceSnapshot(activeWorkspace, selectedTutorialLessonId, selectedDatasetId);
             clearTrainingUiState();
-            setActiveWorkspace('builder');
+            setActiveWorkspace('home');
             setIsCompetitionInfoOpen(false);
             setIsCompetitionRankOpen(false);
             setTutorialGuideOpen(false);
@@ -2293,12 +2373,11 @@ export function BuilderShell() {
             setIsMnistMissionMinimized(false);
             setLessonCoachStep(null);
             setCnn11BaselineChallengeSamples(null);
-            restoreWorkspaceSnapshot('builder', null, datasets[0]?.id ?? 'mnist');
           }}
         />
 
         <div className={shellGridClassName}>
-          {isCompetitionSetupVisible || activeWorkspace === 'learning' ? null : (
+          {isCompetitionSetupVisible || activeWorkspace === 'learning' || activeWorkspace === 'home' ? null : (
             <Sidebar
               selectedDatasetId={selectedDatasetId}
               activeWorkspace={activeWorkspace}
@@ -2346,17 +2425,35 @@ export function BuilderShell() {
               onBlockDragEnd={() => setDraggingBlock(null)}
             />
           )}
-          {activeWorkspace === 'playground' ? (
+          {activeWorkspace === 'home' ? (
+            <div className="min-w-0">
+              <HomeLanding onNavigate={handleWorkspaceSelect} />
+            </div>
+          ) : activeWorkspace === 'playground' ? (
             <div className="min-w-0">
               {playgroundMode === 'stock' ? (
-                <StockPlayground selectedStock={selectedStock ?? stockPlaygroundPresets[0]} />
+                <StockPlayground
+                  selectedStock={selectedStock ?? stockPlaygroundPresets[0]}
+                  onGoToDocs={() => {
+                    setSelectedLearningChapterId('dnn-basics');
+                    setActiveWorkspace('learning');
+                  }}
+                />
               ) : (
-                <RockPaperScissorsPlayground />
+                <RockPaperScissorsPlayground
+                  onGoToCnnDocs={() => {
+                    setSelectedLearningChapterId('cnn-basics');
+                    setActiveWorkspace('learning');
+                  }}
+                />
               )}
             </div>
           ) : activeWorkspace === 'learning' ? (
             <div className="min-w-0 lg:col-span-2">
-              <LearningWorkspace />
+              <LearningWorkspacePanel
+                requestedChapterId={selectedLearningChapterId}
+                onRequestedChapterHandled={() => setSelectedLearningChapterId(null)}
+              />
             </div>
           ) : activeWorkspace === 'competition' && !competitionRoom ? (
             <CompetitionPanel
@@ -2440,51 +2537,56 @@ export function BuilderShell() {
                           >
                             방 나가기
                           </button>
-                          <div className="rounded-[14px] bg-white/12 px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/85">
-                            Run 카드에서 제출
-                          </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="grid gap-3 px-5 py-5 xl:grid-cols-[minmax(0,1.15fr)_180px_180px]">
+                    <div className="grid gap-3 px-5 py-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.6fr)]">
                       <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-4">
-                        <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
-                          Batch size
-                        </div>
-                        <div className="mt-3 flex items-center gap-3">
-                          <input
-                            type="range"
-                            min={0}
-                            max={batchSizeOptions.length - 1}
-                            step={1}
-                            value={Math.max(0, batchSizeOptions.indexOf(batchSize as (typeof batchSizeOptions)[number]))}
-                            onChange={(event) =>
-                              setBatchSize(
-                                batchSizeOptions[Number(event.target.value)] ?? batchSizeOptions[0],
-                              )
-                            }
-                            className="h-1 w-full accent-[#2563eb]"
-                          />
-                          <div className="min-w-[48px] text-right font-display text-[20px] font-bold text-[#10213b]">
-                            {batchSize}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
+                              Competition Progress
+                            </div>
+                            <div className="mt-1 text-[19px] font-bold text-[#10213b]">
+                              {competitionTimeline
+                                ? competitionTimeline.isEnded
+                                  ? '대회가 종료되었습니다'
+                                  : formatRemainingTime(competitionTimeline.remainingMs)
+                                : '진행 중'}
+                            </div>
+                          </div>
+                          <div className="rounded-full bg-[#eef4ff] px-4 py-2 text-[13px] font-extrabold uppercase tracking-[0.14em] text-[#2563eb]">
+                            {competitionTimeline ? `${competitionTimeline.progress}%` : 'Live'}
                           </div>
                         </div>
+                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#e7eef8]">
+                          <div
+                            className="h-full rounded-full bg-[linear-gradient(90deg,#2563eb,#60a5fa)] transition-all duration-500"
+                            style={{ width: `${competitionTimeline?.progress ?? 0}%` }}
+                          />
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[12px] font-semibold text-[#60718a]">
+                          <span>{competitionTimeline ? `시작 ${competitionTimeline.startLabel}` : '대회 시간 정보 확인 중'}</span>
+                          <span>{competitionTimeline ? `종료 ${competitionTimeline.endLabel}` : '진행률 계산 중'}</span>
+                        </div>
                       </div>
-                      <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-4">
-                        <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
-                          Participants
+                      <div className="grid gap-3">
+                        <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-3.5">
+                          <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
+                            Participants
+                          </div>
+                          <div className="mt-1.5 font-display text-[18px] font-bold text-[#10213b]">
+                            {competitionRoom.participants.length}
+                          </div>
                         </div>
-                        <div className="mt-2 font-display text-[22px] font-bold text-[#10213b]">
-                          {competitionRoom.participants.length}
-                        </div>
-                      </div>
-                      <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-4">
-                        <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
-                          Your role
-                        </div>
-                        <div className="mt-2 font-display text-[22px] font-bold text-[#10213b]">
-                          {competitionRoom.participantRole}
+                        <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-3.5">
+                          <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
+                            Your Role
+                          </div>
+                          <div className="mt-1.5 font-display text-[18px] font-bold text-[#10213b]">
+                            {competitionRoom.participantRole}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2496,35 +2598,6 @@ export function BuilderShell() {
                         </div>
                       </div>
                     ) : null}
-                  </div>
-                ) : null}
-                {competitionTimeline ? (
-                  <div className="mb-2.5 rounded-[24px] border border-[#dbe5f1] bg-white px-5 py-4 shadow-[0_16px_36px_rgba(15,23,42,0.06)]">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#6e809a]">
-                          Competition Progress
-                        </div>
-                        <div className="mt-1 text-[18px] font-bold text-[#10213b]">
-                          {competitionTimeline.isEnded
-                            ? '대회가 종료되었습니다'
-                            : formatRemainingTime(competitionTimeline.remainingMs)}
-                        </div>
-                      </div>
-                      <div className="rounded-full bg-[#eef4ff] px-4 py-2 text-[13px] font-extrabold uppercase tracking-[0.14em] text-[#2563eb]">
-                        {competitionTimeline.progress}%
-                      </div>
-                    </div>
-                    <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#e7eef8]">
-                      <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,#2563eb,#60a5fa)] transition-all duration-500"
-                        style={{ width: `${competitionTimeline.progress}%` }}
-                      />
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[13px] font-semibold text-[#60718a]">
-                      <span>시작 {competitionTimeline.startLabel}</span>
-                      <span>종료 {competitionTimeline.endLabel}</span>
-                    </div>
                   </div>
                 ) : null}
                 {showAugmentationPanel ? (
@@ -2864,10 +2937,7 @@ export function BuilderShell() {
             />
           </div>
           <div className="min-w-0 pr-1">
-            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#7c8ca5]">
-              Quick Guide
-            </div>
-            <div className="mt-0.5 font-display text-[15px] font-bold tracking-[-0.03em] text-[#10213b]">
+            <div className="font-display text-[15px] font-bold tracking-[-0.03em] text-[#10213b]">
               Mina에게 물어보기
             </div>
             <div className="mt-1 text-[11px] font-semibold text-[#6d7f99]">
