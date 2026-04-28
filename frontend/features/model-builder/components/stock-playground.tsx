@@ -12,7 +12,12 @@ type StockPlaygroundProps = {
 
 const CHART_WIDTH = 960;
 const CHART_HEIGHT = 440;
-const CHART_PADDING = 28;
+const CHART_MARGIN = {
+  top: 28,
+  right: 34,
+  bottom: 48,
+  left: 58,
+};
 
 function formatPrice(value: number) {
   return `$${value.toFixed(2)}`;
@@ -248,13 +253,13 @@ function PredictionChart({
     const minValue = Math.min(...values);
     const maxValue = Math.max(...values);
     const range = maxValue - minValue || 1;
-    const innerWidth = CHART_WIDTH - CHART_PADDING * 2;
-    const innerHeight = CHART_HEIGHT - CHART_PADDING * 2;
+    const innerWidth = CHART_WIDTH - CHART_MARGIN.left - CHART_MARGIN.right;
+    const innerHeight = CHART_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom;
 
     const xFor = (index: number, total: number) =>
-      CHART_PADDING + (total <= 1 ? innerWidth / 2 : (index / (total - 1)) * innerWidth);
+      CHART_MARGIN.left + (total <= 1 ? innerWidth / 2 : (index / (total - 1)) * innerWidth);
     const yFor = (value: number) =>
-      CHART_PADDING + innerHeight - ((value - minValue) / range) * innerHeight;
+      CHART_MARGIN.top + innerHeight - ((value - minValue) / range) * innerHeight;
 
     const actualPath = history
       .map((point, index) => `${index === 0 ? 'M' : 'L'}${xFor(index, totalPoints).toFixed(2)} ${yFor(point.close).toFixed(2)}`)
@@ -292,13 +297,25 @@ function PredictionChart({
     <div className="mt-4">
       <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="w-full">
         <rect x="0" y="0" width={CHART_WIDTH} height={CHART_HEIGHT} rx="22" fill="#ffffff" stroke="#dbe5f1" />
-        <line x1={CHART_PADDING} y1={CHART_PADDING} x2={CHART_PADDING} y2={CHART_HEIGHT - CHART_PADDING} stroke="#dbe5f1" />
-        <line x1={CHART_PADDING} y1={CHART_HEIGHT - CHART_PADDING} x2={CHART_WIDTH - CHART_PADDING} y2={CHART_HEIGHT - CHART_PADDING} stroke="#dbe5f1" />
         <line
-          x1={CHART_PADDING}
-          y1={CHART_HEIGHT / 2}
-          x2={CHART_WIDTH - CHART_PADDING}
-          y2={CHART_HEIGHT / 2}
+          x1={CHART_MARGIN.left}
+          y1={CHART_MARGIN.top}
+          x2={CHART_MARGIN.left}
+          y2={CHART_HEIGHT - CHART_MARGIN.bottom}
+          stroke="#dbe5f1"
+        />
+        <line
+          x1={CHART_MARGIN.left}
+          y1={CHART_HEIGHT - CHART_MARGIN.bottom}
+          x2={CHART_WIDTH - CHART_MARGIN.right}
+          y2={CHART_HEIGHT - CHART_MARGIN.bottom}
+          stroke="#dbe5f1"
+        />
+        <line
+          x1={CHART_MARGIN.left}
+          y1={CHART_MARGIN.top + (CHART_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom) / 2}
+          x2={CHART_WIDTH - CHART_MARGIN.right}
+          y2={CHART_MARGIN.top + (CHART_HEIGHT - CHART_MARGIN.top - CHART_MARGIN.bottom) / 2}
           stroke="#e7eef8"
           strokeDasharray="5 5"
         />
@@ -321,16 +338,23 @@ function PredictionChart({
             <circle cx={chart.forecastX} cy={chart.forecastY} r="12" fill="rgba(11,125,111,0.12)" />
           </>
         ) : null}
-        <text x={CHART_PADDING} y="18" fill="#7b8da8" fontSize="11" fontWeight="700">
+        <text x={CHART_MARGIN.left - 8} y="18" textAnchor="end" fill="#7b8da8" fontSize="11" fontWeight="700">
           {chart.maxValue.toFixed(2)}
         </text>
-        <text x={CHART_PADDING} y={CHART_HEIGHT - 8} fill="#7b8da8" fontSize="11" fontWeight="700">
+        <text
+          x={CHART_MARGIN.left - 8}
+          y={CHART_HEIGHT - CHART_MARGIN.bottom + 4}
+          textAnchor="end"
+          fill="#7b8da8"
+          fontSize="11"
+          fontWeight="700"
+        >
           {chart.minValue.toFixed(2)}
         </text>
-        <text x={CHART_PADDING} y={CHART_HEIGHT - 8} dx="18" fill="#9aacc5" fontSize="11" fontWeight="700">
+        <text x={CHART_MARGIN.left} y={CHART_HEIGHT - 16} fill="#9aacc5" fontSize="11" fontWeight="700">
           {chart.startDate}
         </text>
-        <text x={CHART_WIDTH - CHART_PADDING} y={CHART_HEIGHT - 8} textAnchor="end" fill="#9aacc5" fontSize="11" fontWeight="700">
+        <text x={CHART_WIDTH - CHART_MARGIN.right} y={CHART_HEIGHT - 16} textAnchor="end" fill="#9aacc5" fontSize="11" fontWeight="700">
           {chart.forecastDate || chart.endDate}
         </text>
       </svg>
