@@ -5,8 +5,6 @@
 VisAIble은 딥러닝 입문자가 코드 문법보다 먼저 **모델 구조, 데이터 흐름, 학습 결과**를 이해하도록 만든 교육용 플랫폼입니다.  
 사용자는 Linear, CNN, Pooling, Dropout 같은 블록을 직접 조립하고, 학습 지표와 Feature Map, Decision Boundary를 보며 모델이 어떻게 판단하는지 확인합니다.
 
-![VisAIble block coding platform preview](https://raw.githubusercontent.com/hamseungjun/VisAIble/main/frontend/public/showcase/landing-block-coding-hero.png)
-
 ## 프로젝트 핵심
 
 딥러닝을 처음 배우는 사람에게 가장 어려운 지점은 모델이 실제로 무엇을 보고, 어떤 구조로 판단하며, 왜 성능이 달라지는지 연결해서 이해하는 것입니다.  
