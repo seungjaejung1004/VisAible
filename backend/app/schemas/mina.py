@@ -1,5 +1,3 @@
-from typing import Literal
-
 from pydantic import BaseModel, Field
 
 
@@ -18,7 +16,6 @@ class MinaNodeSummary(BaseModel):
 
 class MinaChatRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=1200)
-    provider: Literal["gemini", "gemma"] = "gemini"
     requestKind: str = Field(default="general", min_length=1, max_length=32)
     datasetId: str = Field(..., min_length=1, max_length=64)
     datasetLabel: str = Field(..., min_length=1, max_length=200)

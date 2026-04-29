@@ -32,6 +32,7 @@ type TutorialLesson = {
   code: string;
   title: string;
   track: string;
+  trackLabel: string;
   datasetId: string;
   icon: 'layers' | 'panel' | 'flask';
   paletteClass: string;
@@ -68,8 +69,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'mlp-1-1',
     code: 'MLP 1-1',
-    title: 'Dense Network Warmup',
+    title: 'Dense Warm-up / 첫 분류',
     track: 'MLP Track',
+    trackLabel: 'Dense Start',
     datasetId: 'mnist',
     icon: 'layers',
     paletteClass: 'bg-[#edf3ff] text-[#2456c9]',
@@ -84,8 +86,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'mlp-1-2',
     code: 'MLP 1-2',
-    title: 'Stack One More Layer',
+    title: 'Hidden Layer Stack / 표현력 올리기',
     track: 'MLP Track',
+    trackLabel: 'Depth Up',
     datasetId: 'mnist',
     icon: 'layers',
     paletteClass: 'bg-[#edf3ff] text-[#2456c9]',
@@ -100,8 +103,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'cnn-1-1',
     code: 'CNN 1-1',
-    title: 'From Dense to Filters',
+    title: 'Filter Starter / CNN 전환',
     track: 'CNN Track',
+    trackLabel: 'Conv Basics',
     datasetId: 'fashion_mnist',
     icon: 'panel',
     paletteClass: 'bg-[#fff4ea] text-[#b95b16]',
@@ -116,8 +120,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'cnn-1-2',
     code: 'CNN 1-2',
-    title: 'Deep Feature Builder',
+    title: 'Feature Builder / 깊은 CNN',
     track: 'CNN Track',
+    trackLabel: 'Feature Map',
     datasetId: 'fashion_mnist',
     icon: 'panel',
     paletteClass: 'bg-[#fff4ea] text-[#b95b16]',
@@ -132,8 +137,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'cnn-1-3',
     code: 'CNN 1-3',
-    title: 'Generalization With Augmentation',
+    title: 'Augmentation Lab / 일반화',
     track: 'CNN Track',
+    trackLabel: 'Robustness',
     datasetId: 'cifar10',
     icon: 'flask',
     paletteClass: 'bg-[#ebfbf5] text-[#0b7d6f]',
@@ -289,41 +295,70 @@ export function Sidebar({
       ) : null}
 
       {activeWorkspace === 'tutorial' ? (
-        <section className="grid gap-2.5">
-          <h2 className="ui-section-title">Class Selection</h2>
-          <div className="relative grid gap-2">
-            {tutorialLessons.map((lesson) => (
-              <button
-                key={lesson.id}
-                type="button"
-                onClick={() => {
-                  onDatasetSelect(lesson.datasetId);
-                  setOpenedTutorialLessonId(lesson.id);
-                  onTutorialLessonSelect?.(lesson.id);
-                }}
-                className={[
-                  'group flex flex-col gap-1 rounded-[18px] border px-3.5 py-3.5 text-left transition-all',
-                  openedTutorialLessonId === lesson.id
-                    ? 'border-primary/25 bg-primary/10 shadow-[0_8px_20px_rgba(17,81,255,0.08)]'
-                    : 'border-transparent hover:border-[#d9e2ef] hover:bg-white/80',
-                ].join(' ')}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#71839d]">
-                    {lesson.code}
-                  </span>
-                  {openedTutorialLessonId === lesson.id && (
-                    <div className="rounded-full bg-primary/20 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.1em] text-primary">
-                      Active
-                    </div>
-                  )}
-                </div>
-                <div className="font-display text-[15px] font-bold text-[#10213b]">
-                  {lesson.title}
-                </div>
-              </button>
-            ))}
+        <section className="grid gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="ui-section-title">Class Roadmap</h2>
+            <span className="rounded-full border border-[#dbe5f2] bg-white/82 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#7f8ea6]">
+              5 Lessons
+            </span>
+          </div>
+          <div className="relative grid gap-2.5 rounded-[24px] border border-[#dce6f3] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(247,250,255,0.86))] p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_14px_32px_rgba(13,27,51,0.05)]">
+            {tutorialLessons.map((lesson, index) => {
+              const active = openedTutorialLessonId === lesson.id;
 
+              return (
+                <button
+                  key={lesson.id}
+                  type="button"
+                  onClick={() => {
+                    onDatasetSelect(lesson.datasetId);
+                    setOpenedTutorialLessonId(lesson.id);
+                    onTutorialLessonSelect?.(lesson.id);
+                  }}
+                  className={[
+                    'group relative overflow-hidden rounded-[20px] border px-3.5 py-3 pr-10 text-left transition-all',
+                    active
+                      ? 'border-primary/25 bg-white shadow-[0_14px_30px_rgba(17,81,255,0.12)]'
+                      : 'border-transparent bg-white/55 hover:border-[#d9e2ef] hover:bg-white hover:shadow-[0_10px_22px_rgba(13,27,51,0.06)]',
+                  ].join(' ')}
+                >
+                  <div className="pointer-events-none absolute inset-y-3 left-0 w-1 rounded-r-full bg-current opacity-0 transition-opacity group-hover:opacity-50" />
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="relative flex shrink-0 flex-col items-center">
+                      <span
+                        className={[
+                          'grid h-9 w-9 place-items-center rounded-[14px] bg-gradient-to-br text-current shadow-[0_8px_18px_rgba(13,27,51,0.08)]',
+                          lesson.paletteClass,
+                        ].join(' ')}
+                      >
+                        <Icon name={lesson.icon} className="h-4.5 w-4.5" />
+                      </span>
+                      {index < tutorialLessons.length - 1 ? (
+                        <span className="mt-2 h-4 w-px rounded-full bg-[#dce5f2]" />
+                      ) : null}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="rounded-full bg-[#f2f6fd] px-2 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#71839d]">
+                          {lesson.code}
+                        </span>
+                        <span className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${lesson.paletteClass}`}>
+                          {lesson.trackLabel}
+                        </span>
+                      </div>
+                      <div className="mt-2 font-display text-[14px] font-bold leading-[1.22] tracking-[-0.02em] text-[#10213b]">
+                        {lesson.title}
+                      </div>
+                    </div>
+                  </div>
+                  {active ? (
+                    <span className="absolute right-3 top-3 grid h-6 w-6 place-items-center rounded-full bg-primary text-white shadow-[0_8px_18px_rgba(17,81,255,0.2)]">
+                      <Icon name="check" className="h-3.5 w-3.5" />
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </section>
       ) : null}

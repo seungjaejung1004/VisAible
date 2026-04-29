@@ -12,7 +12,6 @@
 - `frontend/`: Next.js UI
 - `backend/`: FastAPI + PyTorch training server
 - `visaible/`: shared Python virtual environment created at the project root
-- `gemma4`: Folder for storing gemma4-e2b-it-edge
 
 ## Requirements
 
@@ -41,12 +40,6 @@ Install frontend dependencies:
 ```bash
 cd /Users/seungjunham/Desktop/hallym/26_1/VisAIble/frontend
 npm install
-```
-
-Download Gemma4 Here : 
-- Put it in gemma4 folder
-```
-https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/tree/main
 ```
 
 ## Run Backend

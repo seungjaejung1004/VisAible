@@ -13,20 +13,16 @@ type MinaMessage = {
 type MinaBubbleChatProps = {
   open: boolean;
   busy: boolean;
-  provider: 'gemini' | 'gemma';
   messages: MinaMessage[];
   onClose: () => void;
-  onProviderChange: (provider: 'gemini' | 'gemma') => void;
   onSend: (message: string) => Promise<void> | void;
 };
 
 export function MinaBubbleChat({
   open,
   busy,
-  provider,
   messages,
   onClose,
-  onProviderChange,
   onSend,
 }: MinaBubbleChatProps) {
   const [draft, setDraft] = useState('');
@@ -68,27 +64,9 @@ export function MinaBubbleChat({
               어떤 블록부터 고치면 좋을까?
             </div>
             <div className="ui-provider-toggle mt-3 inline-flex rounded-full p-1">
-              {([
-                ['gemini', 'Gemini'],
-                ['gemma', 'Gemma'],
-              ] as const).map(([value, label]) => {
-                const active = provider === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => onProviderChange(value)}
-                    className={`rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em] transition ${
-                      active
-                        ? 'ui-provider-toggle-active'
-                        : 'text-[#7083a1] hover:text-[#10213b]'
-                    }`}
-                    aria-pressed={active}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              <span className="ui-provider-toggle-active rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.08em]">
+                Gemini
+              </span>
             </div>
           </div>
           <button
@@ -150,9 +128,7 @@ export function MinaBubbleChat({
           />
           <div className="mt-3 flex items-center justify-between gap-3">
             <div className="text-[11px] font-semibold text-[#7b8da9]">
-              {provider === 'gemini'
-                ? 'Gemini가 현재 블록 구조와 최근 학습 결과를 같이 참고해요'
-                : 'Gemma가 현재 블록 구조와 최근 학습 결과를 같이 참고해요'}
+              Gemini가 현재 블록 구조와 최근 학습 결과를 같이 참고해요
             </div>
             <button
               type="button"

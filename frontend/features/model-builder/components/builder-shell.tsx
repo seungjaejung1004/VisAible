@@ -156,8 +156,6 @@ type MinaCanvasHighlight = {
   reason?: string | null;
 };
 
-type MinaProvider = 'gemini' | 'gemma';
-
 function summarizeBlocks(nodes: CanvasNode[]) {
   if (nodes.length === 0) {
     return 'No blocks added yet.';
@@ -481,7 +479,6 @@ export function BuilderShell() {
   const [isHomeGuideOpen, setIsHomeGuideOpen] = useState(false);
   const [isMinaChatOpen, setIsMinaChatOpen] = useState(false);
   const [minaBusy, setMinaBusy] = useState(false);
-  const [minaProvider, setMinaProvider] = useState<MinaProvider>('gemini');
   const [minaMessages, setMinaMessages] = useState<MinaMessage[]>([
     {
       id: 'mina-intro',
@@ -738,8 +735,10 @@ export function BuilderShell() {
       : activeWorkspace === 'learning'
         ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:gap-4'
       : activeWorkspace === 'competition' && competitionRoom !== null
-        ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[clamp(208px,16vw,236px)_minmax(0,1fr)_clamp(240px,24vw,320px)] xl:gap-4 xl:grid-cols-[clamp(220px,14.5vw,252px)_minmax(0,1fr)_clamp(260px,22vw,360px)]'
-      : 'mt-3 grid min-h-0 items-start gap-3 lg:justify-center lg:grid-cols-[minmax(248px,0.64fr)_minmax(0,1.82fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(252px,14.5vw,296px)_minmax(0,1fr)_clamp(320px,22vw,468px)]';
+        ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_clamp(240px,24vw,320px)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(260px,22vw,360px)]'
+      : activeWorkspace === 'tutorial'
+        ? 'mt-3 grid min-h-0 items-start gap-3 lg:justify-center lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(320px,21vw,448px)]'
+      : 'mt-3 grid min-h-0 items-start gap-3 lg:justify-center lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(320px,21vw,448px)]';
   const handleWorkspaceSelect = (workspace: WorkspaceMode) => {
     if (workspace === activeWorkspace) {
       return;
@@ -1309,7 +1308,6 @@ export function BuilderShell() {
     try {
       const response = await chatWithMina({
         question,
-        provider: minaProvider,
         requestKind,
         datasetId: selectedDataset.id,
         datasetLabel: selectedDataset.label,
@@ -1353,8 +1351,6 @@ export function BuilderShell() {
         error instanceof Error ? error.message : '미안, 지금은 답을 가져오지 못했어. 잠시 후 다시 시도해줘.';
       const minaErrorMessage = errorMessage.includes('Gemini API key is not configured')
         ? '미안, 지금은 Gemini API 키가 설정되지 않아서 답할 수 없어. 백엔드 환경변수나 `backend/.env.local`에 `GOOGLE_API_KEY` 또는 `GEMINI_API_KEY`를 넣어주면 바로 사용할 수 있어.'
-        : errorMessage.includes('Gemma model is not configured')
-          ? '미안, 지금은 Gemma 모델 파일을 찾지 못했어. `gemma4` 폴더에 `.litertlm` 모델이 있는지 확인해줘.'
         : errorMessage;
 
       setMinaMessages((current) => [
@@ -2962,10 +2958,8 @@ export function BuilderShell() {
         <MinaBubbleChat
           open={isMinaChatOpen}
           busy={minaBusy}
-          provider={minaProvider}
           messages={minaMessages}
           onClose={() => setIsMinaChatOpen(false)}
-          onProviderChange={setMinaProvider}
           onSend={handleMinaSend}
         />
       ) : null}

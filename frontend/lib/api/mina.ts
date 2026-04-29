@@ -2,7 +2,6 @@ import { apiClient } from '@/lib/api/client';
 
 export type MinaChatPayload = {
   question: string;
-  provider: 'gemini' | 'gemma';
   requestKind: 'general' | 'improvement';
   datasetId: string;
   datasetLabel: string;

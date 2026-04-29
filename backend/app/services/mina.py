@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-from functools import lru_cache
 from pathlib import Path
 
 import requests
@@ -13,7 +12,6 @@ from app.schemas.mina import MinaChatRequest
 _GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 _GATEWAY_DEFAULT_BASE_URL = "https://factchat-cloud.mindlogic.ai/v1/gateway"
 _LOCAL_ENV_PATH = Path(__file__).resolve().parents[2] / ".env.local"
-_GEMMA_DIR = Path(__file__).resolve().parents[3] / "gemma4"
 
 
 def _read_local_env_value(key: str) -> str | None:
@@ -145,38 +143,6 @@ def _gateway_base_url() -> str:
 
 def _gateway_model() -> str:
     return _read_env_or_local("HAI_GPT_MODEL", "MINDLOGIC_MODEL", "FACTCHAT_MODEL") or _gemini_model()
-
-
-def _gemma_model_path() -> Path:
-    configured = os.getenv("GEMMA_MODEL_PATH") or _read_local_env_value("GEMMA_MODEL_PATH")
-    if configured:
-        candidate = Path(configured).expanduser()
-        if candidate.exists():
-            return candidate
-
-    for candidate in sorted(_GEMMA_DIR.glob("*.litertlm")):
-        if candidate.is_file():
-            return candidate
-
-    raise ValueError(
-        "Gemma model is not configured. Add a .litertlm model to gemma4/ or set GEMMA_MODEL_PATH."
-    )
-
-
-@lru_cache(maxsize=1)
-def _get_gemma_engine():
-    try:
-        import litert_lm
-    except ImportError as error:
-        raise ValueError(
-            "Gemma runtime is not installed. Install litert_lm to use the Gemma provider."
-        ) from error
-
-    model_path = _gemma_model_path()
-    try:
-        return litert_lm.Engine(str(model_path))
-    except Exception as error:
-        raise ValueError(f"Failed to load Gemma model from {model_path.name}: {error}") from error
 
 
 def _extract_json_block(raw_text: str) -> dict[str, object]:
@@ -576,49 +542,7 @@ def _chat_with_gemini(payload: MinaChatRequest) -> dict[str, object]:
     return _parse_response(_extract_candidate_text(retry_response_payload))
 
 
-def _extract_gemma_text(response: object) -> str:
-    if isinstance(response, str) and response.strip():
-        return response.strip()
-
-    if isinstance(response, dict):
-        content = response.get("content")
-        if isinstance(content, list):
-            parts: list[str] = []
-            for item in content:
-                if isinstance(item, dict):
-                    text = item.get("text")
-                    if isinstance(text, str) and text.strip():
-                        parts.append(text.strip())
-            if parts:
-                return "\n".join(parts)
-
-        text = response.get("text")
-        if isinstance(text, str) and text.strip():
-            return text.strip()
-
-    raise ValueError("Gemma returned an empty response")
-
-
-def _chat_with_gemma(payload: MinaChatRequest) -> dict[str, object]:
-    engine = _get_gemma_engine()
-    prompt = (
-        f"System instruction:\n{_build_system_instruction(payload)}\n\n"
-        f"User context:\n{_build_common_context(payload)}"
-    )
-
-    try:
-        with engine.create_conversation() as conversation:
-            response = conversation.send_message(prompt)
-    except Exception as error:
-        raise ValueError(f"Gemma request failed: {error}") from error
-
-    return _parse_response(_extract_gemma_text(response))
-
-
 def chat_with_mina(payload: MinaChatRequest) -> dict[str, object]:
-    if payload.provider == "gemma":
-        return _chat_with_gemma(payload)
-
     if _gateway_api_key():
         return _chat_with_gateway(payload)
 
