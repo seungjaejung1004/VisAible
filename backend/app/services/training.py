@@ -89,11 +89,11 @@ AUGMENTATION_PARAM_RANGES: dict[str, tuple[float, float]] = {
     "grayscale": (0.0, 100.0),
 }
 DECISION_BOUNDARY_WEIGHT_FACTORS: dict[str, float] = {
-    "mnist": 10.0,
-    "fashion_mnist": 10.0,
-    "cifar10": 26.0,
-    "oxford_iiit_pet": 8.0,
-    "flowers102": 8.0,
+    "mnist": 9.0,
+    "fashion_mnist": 9.0,
+    "cifar10": 25.0,
+    "oxford_iiit_pet": 7.0,
+    "flowers102": 7.0,
 }
 DECISION_BOUNDARY_DIR = Path(__file__).resolve().parent.parent / "data" / "decision_boundary"
 FASHION_MNIST_LAUNDRY_CHALLENGE_PATH = (

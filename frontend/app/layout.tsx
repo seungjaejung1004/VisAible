@@ -13,9 +13,9 @@ export const metadata: Metadata = {
   title: 'VisAible',
   description: 'Neural architecture builder UI',
   icons: {
-    icon: '/visaible-favicon-square.png',
-    shortcut: '/visaible-favicon-square.png',
-    apple: '/visaible-favicon-square.png',
+    icon: '/visaible-favicon-transparent.png',
+    shortcut: '/visaible-favicon-transparent.png',
+    apple: '/visaible-favicon-transparent.png',
   },
 };
 

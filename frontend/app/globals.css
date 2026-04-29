@@ -74,6 +74,104 @@
     @apply font-display text-[18px] font-bold tracking-[-0.03em] text-[#10213b];
   }
 
+  .learning-markdown {
+    @apply text-[13px] leading-[1.7] text-[#24405f];
+  }
+
+  .learning-markdown > :first-child {
+    margin-top: 0;
+  }
+
+  .learning-markdown > :last-child {
+    margin-bottom: 0;
+  }
+
+  .learning-markdown h1,
+  .learning-markdown h2,
+  .learning-markdown h3,
+  .learning-markdown h4 {
+    @apply mt-4 mb-2 font-display font-bold tracking-[-0.03em] text-[#10213b];
+  }
+
+  .learning-markdown h1 {
+    @apply text-[18px];
+  }
+
+  .learning-markdown h2 {
+    @apply text-[16px];
+  }
+
+  .learning-markdown h3,
+  .learning-markdown h4 {
+    @apply text-[14px];
+  }
+
+  .learning-markdown p {
+    @apply my-2;
+  }
+
+  .learning-markdown ul,
+  .learning-markdown ol {
+    @apply my-2 pl-5;
+  }
+
+  .learning-markdown ul {
+    list-style-type: disc;
+  }
+
+  .learning-markdown ol {
+    list-style-type: decimal;
+  }
+
+  .learning-markdown li {
+    @apply mt-1;
+  }
+
+  .learning-markdown a {
+    @apply font-semibold text-primary underline decoration-primary/35 underline-offset-2;
+  }
+
+  .learning-markdown strong {
+    @apply font-extrabold text-[#10213b];
+  }
+
+  .learning-markdown code {
+    @apply rounded-[8px] bg-[#eef4ff] px-1.5 py-0.5 font-mono text-[12px] text-[#183b78];
+  }
+
+  .learning-markdown pre {
+    @apply my-3 overflow-x-auto rounded-[14px] bg-[#10213b] px-3.5 py-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06)];
+  }
+
+  .learning-markdown pre code {
+    @apply bg-transparent p-0 text-[12px] leading-6 text-white;
+  }
+
+  .learning-markdown blockquote {
+    @apply my-3 border-l-[3px] border-[#c8d8f7] bg-[#f7faff] px-3 py-2 text-[#4f627f];
+  }
+
+  .learning-markdown hr {
+    @apply my-3 border-0 border-t border-[#dbe5f1];
+  }
+
+  .learning-markdown table {
+    @apply my-3 block w-full overflow-x-auto rounded-[12px] border border-[#dbe5f1];
+  }
+
+  .learning-markdown thead {
+    @apply bg-[#f4f7fc];
+  }
+
+  .learning-markdown th,
+  .learning-markdown td {
+    @apply border-b border-[#dbe5f1] px-3 py-2 text-left align-top;
+  }
+
+  .learning-markdown tr:last-child td {
+    border-bottom: 0;
+  }
+
   .animate-mascot-float {
     animation: mascot-float 2.8s ease-in-out infinite;
   }

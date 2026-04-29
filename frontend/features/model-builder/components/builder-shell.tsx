@@ -737,6 +737,8 @@ export function BuilderShell() {
       ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] xl:gap-4'
       : activeWorkspace === 'learning'
         ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:gap-4'
+      : activeWorkspace === 'competition' && competitionRoom !== null
+        ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[clamp(208px,16vw,236px)_minmax(0,1fr)_clamp(240px,24vw,320px)] xl:gap-4 xl:grid-cols-[clamp(220px,14.5vw,252px)_minmax(0,1fr)_clamp(260px,22vw,360px)]'
       : 'mt-3 grid min-h-0 items-start gap-3 lg:justify-center lg:grid-cols-[minmax(248px,0.64fr)_minmax(0,1.82fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(252px,14.5vw,296px)_minmax(0,1fr)_clamp(320px,22vw,468px)]';
   const handleWorkspaceSelect = (workspace: WorkspaceMode) => {
     if (workspace === activeWorkspace) {
@@ -2335,10 +2337,11 @@ export function BuilderShell() {
     (isCnn11TutorialActive &&
       tutorialStep === 'build-model');
   const isBottomActionVisible =
-    activeWorkspace === 'builder' ||
-    (activeWorkspace === 'competition' && competitionRoom !== null) ||
-    (activeWorkspace === 'tutorial' &&
-      (!isStoryTutorialActive || !isTutorialSceneVisible || shouldForceTutorialBottomAction));
+    !isCompetitionRankOpen &&
+    (activeWorkspace === 'builder' ||
+      (activeWorkspace === 'competition' && competitionRoom !== null) ||
+      (activeWorkspace === 'tutorial' &&
+        (!isStoryTutorialActive || !isTutorialSceneVisible || shouldForceTutorialBottomAction)));
   const isTrainButtonRunning = isTraining && currentJobId !== null;
   const optimizerConfig = optimizerConfigs[optimizer];
   const learningRates = optimizerConfig.learningRates;
@@ -2464,63 +2467,69 @@ export function BuilderShell() {
             />
           ) : (
             <>
-              <div className="relative min-h-0">
+              <div className="relative min-h-0 min-w-0">
                 {competitionActive ? (
                   <div className="mb-2.5 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-[#f8fbff] shadow-[0_16px_36px_rgba(15,23,42,0.06)]">
                     <div className="border-b border-[#dbe5f1] bg-[linear-gradient(135deg,#0f172a,#173968_48%,#2563eb)] px-5 py-5 text-white">
                       <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-white/65">
                             VisAible Competition
                           </div>
                           <div className="mt-1 font-display text-[28px] font-bold tracking-[-0.04em]">
                             {competitionRoom.title}
                           </div>
-                          <div className="mt-2 text-[13px] font-semibold text-white/75">
-                            Code {competitionRoom.roomCode} · Host {competitionRoom.hostName} · {selectedDataset.label}
-                          </div>
-                          {competitionRoom.participantRole === 'host' ? (
-                            <div className="relative mt-4 flex flex-wrap items-center gap-2">
+                          <div className="relative mt-3 flex flex-wrap items-center gap-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/90">
+                            <div className="rounded-full border border-white/15 bg-white/12 px-3 py-1.5">
+                              Code {competitionRoom.roomCode}
+                            </div>
+                            <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-white/82">
+                              Host {competitionRoom.hostName}
+                            </div>
+                            <div className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-white/82">
+                              Invite Only
+                            </div>
+                            {competitionRoom.participantRole === 'host' ? (
                               <button
                                 type="button"
                                 onClick={() => {
                                   setIsCompetitionInfoOpen((current) => !current);
                                   void handleCopyCompetitionText('Info', competitionInfoText);
                                 }}
-                                className="inline-flex items-center gap-2 rounded-[12px] border border-white/15 bg-white/12 px-3 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white"
+                                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/12 px-3 py-1.5 text-white"
                               >
                                 <Icon name="copy" className="h-4 w-4" />
                                 Info
                               </button>
-                              {isCompetitionInfoOpen ? (
-                                <div className="absolute left-0 top-full z-20 mt-3 w-[min(320px,80vw)] rounded-[18px] border border-white/15 bg-[rgba(15,23,42,0.88)] p-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.28)] backdrop-blur">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/70">
-                                      Room Info
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => setIsCompetitionInfoOpen(false)}
-                                      className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/75"
-                                    >
-                                      Close
-                                    </button>
+                            ) : null}
+                            {competitionCopyFeedback ? (
+                              <div className="rounded-full bg-white/14 px-3 py-1.5 text-white">
+                                {competitionCopyFeedback}
+                              </div>
+                            ) : null}
+                            {competitionRoom.participantRole === 'host' && isCompetitionInfoOpen ? (
+                              <div className="absolute left-0 top-full z-20 mt-3 w-[min(320px,80vw)] rounded-[18px] border border-white/15 bg-[rgba(15,23,42,0.88)] p-4 text-white shadow-[0_18px_40px_rgba(15,23,42,0.28)] backdrop-blur">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/70">
+                                    Room Info
                                   </div>
-                                  <pre className="mt-3 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-white/90">
-                                    {competitionInfoText}
-                                  </pre>
-                                  <div className="mt-3 text-[11px] font-semibold text-white/65">
-                                    {competitionCopyFeedback ?? '클릭하면 정보가 복사됩니다.'}
-                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsCompetitionInfoOpen(false)}
+                                    className="rounded-full border border-white/10 px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white/75"
+                                  >
+                                    Close
+                                  </button>
                                 </div>
-                              ) : null}
-                              {competitionCopyFeedback ? (
-                                <div className="rounded-full bg-white/14 px-3 py-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white">
-                                  {competitionCopyFeedback}
+                                <pre className="mt-3 whitespace-pre-wrap break-words font-mono text-[12px] leading-6 text-white/90">
+                                  {competitionInfoText}
+                                </pre>
+                                <div className="mt-3 text-[11px] font-semibold text-white/65">
+                                  {competitionCopyFeedback ?? '클릭하면 정보가 복사됩니다.'}
                                 </div>
-                              ) : null}
-                            </div>
-                          ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
@@ -2539,16 +2548,21 @@ export function BuilderShell() {
                           </button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="grid gap-3 px-5 py-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.6fr)]">
-                      <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="mt-5 rounded-[22px] border border-white/18 bg-[rgba(255,255,255,0.14)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] backdrop-blur-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
-                            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
+                            <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-white/65">
                               Competition Progress
                             </div>
-                            <div className="mt-1 text-[19px] font-bold text-[#10213b]">
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <div className="rounded-full bg-white/18 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-white">
+                                {competitionTimeline?.isEnded ? 'Ended' : 'Running'}
+                              </div>
+                              <div className="rounded-full bg-[#dbeafe] px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#1d4ed8]">
+                                {competitionTimeline ? `${competitionTimeline.progress}%` : 'Live'}
+                              </div>
+                            </div>
+                            <div className="mt-2 text-[22px] font-bold tracking-[-0.04em] text-white">
                               {competitionTimeline
                                 ? competitionTimeline.isEnded
                                   ? '대회가 종료되었습니다'
@@ -2556,36 +2570,28 @@ export function BuilderShell() {
                                 : '진행 중'}
                             </div>
                           </div>
-                          <div className="rounded-full bg-[#eef4ff] px-4 py-2 text-[13px] font-extrabold uppercase tracking-[0.14em] text-[#2563eb]">
-                            {competitionTimeline ? `${competitionTimeline.progress}%` : 'Live'}
-                          </div>
                         </div>
-                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#e7eef8]">
-                          <div
-                            className="h-full rounded-full bg-[linear-gradient(90deg,#2563eb,#60a5fa)] transition-all duration-500"
-                            style={{ width: `${competitionTimeline?.progress ?? 0}%` }}
-                          />
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[12px] font-semibold text-[#60718a]">
-                          <span>{competitionTimeline ? `시작 ${competitionTimeline.startLabel}` : '대회 시간 정보 확인 중'}</span>
-                          <span>{competitionTimeline ? `종료 ${competitionTimeline.endLabel}` : '진행률 계산 중'}</span>
-                        </div>
-                      </div>
-                      <div className="grid gap-3">
-                        <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-3.5">
-                          <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
-                            Participants
+                        <div className="relative mt-3">
+                          <div className="h-2.5 overflow-hidden rounded-full bg-white/18">
+                            <div
+                              className="h-full rounded-full bg-[linear-gradient(90deg,#bfdbfe,#ffffff)] transition-all duration-500"
+                              style={{ width: `${Math.max(competitionTimeline?.progress ?? 0, competitionTimeline?.isEnded ? 100 : 6)}%` }}
+                            />
                           </div>
-                          <div className="mt-1.5 font-display text-[18px] font-bold text-[#10213b]">
-                            {competitionRoom.participants.length}
-                          </div>
+                          <div className="pointer-events-none absolute right-0 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full border border-white/45 bg-white shadow-[0_0_0_3px_rgba(255,255,255,0.08)]" />
                         </div>
-                        <div className="rounded-[20px] border border-[#dbe5f1] bg-white px-4 py-3.5">
-                          <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#71839d]">
-                            Your Role
+                        <div className="mt-3 flex flex-col gap-2 text-[12px] font-semibold text-white/82 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                          <div className="min-w-0">
+                            <span className="uppercase tracking-[0.14em] text-white/55">Start</span>{' '}
+                            <span className="text-white">
+                              {competitionTimeline ? competitionTimeline.startLabel : '-'}
+                            </span>
                           </div>
-                          <div className="mt-1.5 font-display text-[18px] font-bold text-[#10213b]">
-                            {competitionRoom.participantRole}
+                          <div className="min-w-0 sm:text-right">
+                            <span className="uppercase tracking-[0.14em] text-white/55">Deadline</span>{' '}
+                            <span className="text-white">
+                              {competitionTimeline ? competitionTimeline.endLabel : '-'}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -2758,16 +2764,18 @@ export function BuilderShell() {
                 ) : null}
               </div>
               {competitionActive && competitionRoom ? (
-                <CompetitionSidebar
-                  room={competitionRoom}
-                  trainingStatus={trainingStatus ?? (latestTrainingResult as TrainingJobStatus | null)}
-                  liveHistory={liveHistory}
-                  runs={competitionRuns}
-                  selectedRunJobId={selectedCompetitionRunJobId}
-                  submitBusy={competitionSubmitBusy}
-                  onSelectRun={setSelectedCompetitionRunJobId}
-                  onSubmitRun={(jobId) => void handleSubmitCompetitionRun(jobId)}
-                />
+                <div className="min-w-0">
+                  <CompetitionSidebar
+                    room={competitionRoom}
+                    trainingStatus={trainingStatus ?? (latestTrainingResult as TrainingJobStatus | null)}
+                    liveHistory={liveHistory}
+                    runs={competitionRuns}
+                    selectedRunJobId={selectedCompetitionRunJobId}
+                    submitBusy={competitionSubmitBusy}
+                    onSelectRun={setSelectedCompetitionRunJobId}
+                    onSubmitRun={(jobId) => void handleSubmitCompetitionRun(jobId)}
+                  />
+                </div>
               ) : !isMnistTutorialActive || tutorialStep !== 'story-intro' || showTutorialMetricsSidebar ? (
                 <Inspector
                   trainingStatus={trainingStatus ?? (latestTrainingResult as TrainingJobStatus | null)}
@@ -2807,16 +2815,16 @@ export function BuilderShell() {
                 'linear-gradient(180deg, rgba(244,247,251,0), rgba(244,247,251,0.94) 44%, rgba(244,247,251,1))',
             }}
           />
-          <div className="pointer-events-auto relative rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(251,253,255,0.97),rgba(239,245,255,0.94))] px-3 py-3 shadow-[0_24px_60px_rgba(15,23,42,0.16)] backdrop-blur-xl">
+          <div className="pointer-events-auto relative rounded-[30px] border border-white/80 bg-[linear-gradient(180deg,rgba(251,253,255,0.97),rgba(239,245,255,0.94))] px-3 py-2.5 shadow-[0_24px_60px_rgba(15,23,42,0.16)] backdrop-blur-xl">
             <div className="grid gap-3 xl:grid-cols-[minmax(0,1.95fr)_minmax(400px,0.95fr)]">
-              <div className="rounded-[24px] border border-[#d7e2f2] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(244,248,255,0.88))] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_10px_24px_rgba(15,23,42,0.05)]">
-                <div className="grid gap-2.5 lg:grid-cols-[0.95fr_1.05fr_1.05fr_0.56fr]">
+              <div className="rounded-[24px] border border-[#d7e2f2] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(244,248,255,0.88))] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_10px_24px_rgba(15,23,42,0.05)]">
+                <div className="grid items-stretch gap-2.5 lg:grid-cols-[0.95fr_1.05fr_1.05fr_0.56fr]">
                   <div
-                    className="rounded-[18px] border border-white/80 bg-white/96 px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
+                    className="h-[72px] rounded-[18px] border border-white/80 bg-white/96 px-4 py-2.5 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
                     data-tutorial-target="tutorial-optimizer-control"
                   >
                     <div className="ui-section-title">Optimizer</div>
-                    <div className="relative mt-2">
+                    <div className="relative mt-1.5">
                       <select value={optimizer} onChange={(event) => {
                         const value = event.target.value as OptimizerName;
                         const config = optimizerConfigs[value];
@@ -2826,7 +2834,7 @@ export function BuilderShell() {
                           const parameter = config.parameter;
                           setOptimizerParams((current) => ({ ...current, [parameter.key]: parameter.defaultValue }));
                         }
-                      }} className="w-full appearance-none rounded-[14px] border border-[#d5deeb] bg-[#f8fbff] px-3 py-2.5 pr-9 font-display text-[15px] font-bold text-[#153ea8] outline-none transition-colors focus:border-primary">
+                      }} className="h-9 w-full appearance-none rounded-[13px] border border-[#d5deeb] bg-[#f8fbff] px-3 pr-9 font-display text-[15px] font-bold text-[#153ea8] outline-none transition-colors focus:border-primary">
                         {optimizerOrder.map((option) => (
                           <option key={option} value={option}>{option}</option>
                         ))}
@@ -2835,49 +2843,49 @@ export function BuilderShell() {
                     </div>
                   </div>
                   <div
-                    className="rounded-[18px] border border-white/80 bg-white/96 px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
+                    className="h-[72px] rounded-[18px] border border-white/80 bg-white/96 px-4 py-2.5 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
                     data-tutorial-target="tutorial-learning-rate-control"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="ui-section-title">Learning Rate</div>
                       <code className="block min-w-[78px] text-right font-display text-[13px] font-bold tabular-nums text-[#153ea8]">{learningRate}</code>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-2.5">
                       <input type="range" min={0} max={learningRates.length - 1} step={1} value={learningRateIndex} onChange={(event) => setLearningRate(learningRates[Number(event.target.value)] ?? learningRates[0])} className="h-1.5 w-full accent-primary" />
                     </div>
                   </div>
                   <div
-                    className="rounded-[18px] border border-white/80 bg-white/96 px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
+                    className="h-[72px] rounded-[18px] border border-white/80 bg-white/96 px-4 py-2.5 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
                     data-tutorial-target="tutorial-batch-size-control"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="ui-section-title">Batch Size</div>
                       <code className="block min-w-[56px] text-right font-display text-[13px] font-bold tabular-nums text-[#153ea8]">{batchSize}</code>
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-2.5">
                       <input type="range" min={0} max={batchSizeOptions.length - 1} step={1} value={batchSizeIndex} onChange={(event) => setBatchSize(batchSizeOptions[Number(event.target.value)] ?? batchSizeOptions[0])} className="h-1.5 w-full accent-primary" />
                     </div>
                   </div>
                   <div
-                    className="rounded-[18px] border border-white/80 bg-white/96 px-4 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
+                    className="h-[72px] rounded-[18px] border border-white/80 bg-white/96 px-4 py-2.5 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
                     data-tutorial-target="tutorial-epochs-control"
                   >
                     <div className="ui-section-title">Epochs</div>
-                    <input type="number" min={1} max={500} value={epochs} onChange={(event) => setEpochs(event.target.value)} className="mt-2 w-full rounded-[14px] border border-[#d5deeb] bg-[#f8fbff] px-3 py-2.5 font-display text-[15px] font-bold text-[#153ea8] outline-none transition-colors focus:border-primary" />
+                    <input type="number" min={1} max={500} value={epochs} onChange={(event) => setEpochs(event.target.value)} className="mt-1.5 h-9 w-full rounded-[13px] border border-[#d5deeb] bg-[#f8fbff] px-3 font-display text-[15px] font-bold text-[#153ea8] outline-none transition-colors focus:border-primary" />
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-[#d7e2f2] bg-[linear-gradient(180deg,rgba(238,244,255,0.92),rgba(229,238,255,0.88))] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_10px_24px_rgba(15,23,42,0.05)]">
-                <div className="grid gap-2.5 lg:grid-cols-[1.18fr_1fr_1fr]">
-                  <button type="button" onClick={isTrainButtonRunning ? handleTrainingStop : handleTrainingStart} data-tutorial-target="tutorial-start-button" className={['flex min-w-0 items-center gap-3 rounded-[20px] px-4 py-3.5 text-left transition-all', isTrainButtonRunning ? 'bg-[linear-gradient(135deg,#ff7a59,#f97316)] text-white shadow-[0_16px_36px_rgba(249,115,22,0.28)]' : 'bg-[linear-gradient(135deg,#1151ff,#2f6cff)] text-white shadow-[0_16px_36px_rgba(17,81,255,0.24)]'].join(' ')}>
+              <div className="rounded-[24px] border border-[#d7e2f2] bg-[linear-gradient(180deg,rgba(238,244,255,0.92),rgba(229,238,255,0.88))] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_10px_24px_rgba(15,23,42,0.05)]">
+                <div className="grid items-stretch gap-2.5 lg:grid-cols-[1.18fr_1fr_1fr]">
+                  <button type="button" onClick={isTrainButtonRunning ? handleTrainingStop : handleTrainingStart} data-tutorial-target="tutorial-start-button" className={['flex h-[72px] min-w-0 items-center gap-3 rounded-[20px] px-4 text-left transition-all', isTrainButtonRunning ? 'bg-[linear-gradient(135deg,#ff7a59,#f97316)] text-white shadow-[0_16px_36px_rgba(249,115,22,0.28)]' : 'bg-[linear-gradient(135deg,#1151ff,#2f6cff)] text-white shadow-[0_16px_36px_rgba(17,81,255,0.24)]'].join(' ')}>
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-white/16"><Icon name={isTrainButtonRunning ? 'stop' : 'play'} className="h-5 w-5" /></span>
                     <span className="min-w-0">
                       <span className="block font-display text-[16px] font-bold leading-none">{isTrainButtonRunning ? 'Running' : 'Start'}</span>
                       <span className="mt-1 block text-[12px] font-semibold leading-none text-white/80">{isTrainButtonRunning ? 'Stop training' : 'Run training'}</span>
                     </span>
                   </button>
-                  <button type="button" onClick={handlePreviewOpen} className="flex min-w-0 items-center gap-3 rounded-[20px] border border-white/80 bg-white/96 px-4 py-3.5 text-left text-primary shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fbff]">
+                  <button type="button" onClick={handlePreviewOpen} className="flex h-[72px] min-w-0 items-center gap-3 rounded-[20px] border border-white/80 bg-white/96 px-4 text-left text-primary shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition hover:bg-[#f8fbff]">
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-[#edf3ff]"><Icon name="architecture" className="h-5 w-5" /></span>
                     <span className="min-w-0">
                       <span className="block font-display text-[15px] font-bold leading-none">Preview</span>
@@ -2896,7 +2904,7 @@ export function BuilderShell() {
                       }
                       resetBoard();
                     }}
-                    className="flex min-w-0 items-center gap-3 rounded-[20px] border border-white/80 bg-white/82 px-4 py-3.5 text-left text-[#28405f] shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition hover:bg-white"
+                    className="flex h-[72px] min-w-0 items-center gap-3 rounded-[20px] border border-white/80 bg-white/82 px-4 text-left text-[#28405f] shadow-[0_8px_20px_rgba(15,23,42,0.04)] transition hover:bg-white"
                   >
                     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-white"><Icon name="reset" className="h-5 w-5" /></span>
                     <span className="min-w-0">

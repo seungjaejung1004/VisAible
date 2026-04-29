@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Document, Page, pdfjs } from 'react-pdf';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Icon } from '@/features/model-builder/components/icons';
 import {
   chatWithLearning,
@@ -50,7 +51,11 @@ type PdfSelectionBox = {
   height: number;
 };
 
-pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+type ReactPdfModule = typeof import('react-pdf');
+type ReactPdfComponents = {
+  Document: ReactPdfModule['Document'];
+  Page: ReactPdfModule['Page'];
+};
 
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -216,8 +221,36 @@ function PdfSelectionViewer({
   const [selectionDraft, setSelectionDraft] = useState<PdfSelectionDraft | null>(null);
   const [capturedRegion, setCapturedRegion] = useState<PdfRegionImage | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [pdfComponents, setPdfComponents] = useState<ReactPdfComponents | null>(null);
 
   const selectionBox = useMemo(() => getSelectionBox(selectionDraft), [selectionDraft]);
+  const Document = pdfComponents?.Document;
+  const Page = pdfComponents?.Page;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void import('react-pdf')
+      .then((module) => {
+        module.pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+        if (!cancelled) {
+          setPdfComponents({
+            Document: module.Document,
+            Page: module.Page,
+          });
+          onError(null);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          onError(error instanceof Error ? error.message : 'PDF viewer를 초기화하지 못했습니다.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [onError]);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -331,65 +364,71 @@ function PdfSelectionViewer({
       </div>
 
       <div data-pdf-page-scroll className="min-h-0 overflow-auto px-3 py-3">
-      <Document
-        key={chapter.id}
-        file={pdfUrl}
-        loading={<div className="grid h-full min-h-0 place-items-center py-16 text-[13px] font-semibold text-[#60718a]">PDF를 렌더링하는 중입니다...</div>}
-        error={<div className="grid h-full min-h-0 place-items-center px-6 py-16 text-center text-[13px] font-semibold text-[#b42318]">PDF를 렌더링하지 못했습니다. Open PDF로 원본을 열어주세요.</div>}
-        onLoadSuccess={({ numPages }) => {
-          setPageCount(numPages);
-          setCurrentPage(1);
-        }}
-      >
-        {pageCount > 0 ? (
-          (() => {
-            const pageNumber = currentPage;
-            const activeBox = selectionBox?.pageNumber === pageNumber ? selectionBox : null;
-            const activeCapture = capturedRegion?.pageNumber === pageNumber ? capturedRegion : null;
+        {Document && Page ? (
+          <Document
+            key={chapter.id}
+            file={pdfUrl}
+            loading={<div className="grid h-full min-h-0 place-items-center py-16 text-[13px] font-semibold text-[#60718a]">PDF를 렌더링하는 중입니다...</div>}
+            error={<div className="grid h-full min-h-0 place-items-center px-6 py-16 text-center text-[13px] font-semibold text-[#b42318]">PDF를 렌더링하지 못했습니다. Open PDF로 원본을 열어주세요.</div>}
+            onLoadSuccess={({ numPages }) => {
+              setPageCount(numPages);
+              setCurrentPage(1);
+            }}
+          >
+            {pageCount > 0 ? (
+              (() => {
+                const pageNumber = currentPage;
+                const activeBox = selectionBox?.pageNumber === pageNumber ? selectionBox : null;
+                const activeCapture = capturedRegion?.pageNumber === pageNumber ? capturedRegion : null;
 
-            return (
-            <div
-              key={`${chapter.id}-${pageNumber}`}
-              ref={(element) => {
-                pageRefs.current[pageNumber] = element;
-              }}
-              className="learning-pdf-page-shell relative mx-auto w-fit overflow-hidden rounded-[14px] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.11)]"
-              onPointerDown={(event) => startSelection(event, pageNumber)}
-              onPointerMove={(event) => updateSelection(event, pageNumber)}
-              onPointerUp={(event) => void finishSelection(event, pageNumber)}
-              onPointerCancel={() => {
-                setIsSelecting(false);
-                setSelectionDraft(null);
-              }}
-            >
-              <Page pageNumber={pageNumber} width={viewerWidth} renderAnnotationLayer={false} renderTextLayer />
-              {activeBox ? (
-                <div
-                  className="pointer-events-none absolute border-[3px] border-primary shadow-[0_0_0_1px_rgba(255,255,255,0.92)]"
-                  style={{
-                    left: activeBox.left,
-                    top: activeBox.top,
-                    width: activeBox.width,
-                    height: activeBox.height,
-                  }}
-                />
-              ) : null}
-              {activeBox && activeCapture ? (
-                <div
-                  className="pointer-events-none absolute inline-flex items-center rounded-full border border-primary/20 bg-white px-2.5 py-1 text-[10px] font-extrabold tracking-[0.04em] text-primary shadow-[0_8px_18px_rgba(17,81,255,0.16)]"
-                  style={{
-                    left: activeBox.left + 10,
-                    top: Math.max(activeBox.top + 10, 10),
-                  }}
-                >
-                  첨부 완료
-                </div>
-              ) : null}
-            </div>
-            );
-          })()
-        ) : null}
-      </Document>
+                return (
+                  <div
+                    key={`${chapter.id}-${pageNumber}`}
+                    ref={(element) => {
+                      pageRefs.current[pageNumber] = element;
+                    }}
+                    className="learning-pdf-page-shell relative mx-auto w-fit overflow-hidden rounded-[14px] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.11)]"
+                    onPointerDown={(event) => startSelection(event, pageNumber)}
+                    onPointerMove={(event) => updateSelection(event, pageNumber)}
+                    onPointerUp={(event) => void finishSelection(event, pageNumber)}
+                    onPointerCancel={() => {
+                      setIsSelecting(false);
+                      setSelectionDraft(null);
+                    }}
+                  >
+                    <Page pageNumber={pageNumber} width={viewerWidth} renderAnnotationLayer={false} renderTextLayer />
+                    {activeBox ? (
+                      <div
+                        className="pointer-events-none absolute border-[3px] border-primary shadow-[0_0_0_1px_rgba(255,255,255,0.92)]"
+                        style={{
+                          left: activeBox.left,
+                          top: activeBox.top,
+                          width: activeBox.width,
+                          height: activeBox.height,
+                        }}
+                      />
+                    ) : null}
+                    {activeBox && activeCapture ? (
+                      <div
+                        className="pointer-events-none absolute inline-flex items-center rounded-full border border-primary/20 bg-white px-2.5 py-1 text-[10px] font-extrabold tracking-[0.04em] text-primary shadow-[0_8px_18px_rgba(17,81,255,0.16)]"
+                        style={{
+                          left: activeBox.left + 10,
+                          top: Math.max(activeBox.top + 10, 10),
+                        }}
+                      >
+                        첨부 완료
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })()
+            ) : null}
+          </Document>
+        ) : (
+          <div className="grid h-full min-h-0 place-items-center py-16 text-[13px] font-semibold text-[#60718a]">
+            PDF viewer를 준비하는 중입니다...
+          </div>
+        )}
       </div>
 
       <div className="sticky bottom-0 z-20 flex items-center justify-center gap-3 border-t border-[#dbe5f1] bg-white/95 px-4 py-3 backdrop-blur">
@@ -776,9 +815,13 @@ export function LearningWorkspace({
             message.role === 'assistant' ? (
               <div
                 key={message.id}
-                className="max-w-[94%] rounded-[16px] rounded-tl-[8px] border border-[#dbe5f1] bg-white px-4 py-3 text-[13px] leading-[1.65] text-[#24405f] shadow-[0_8px_20px_rgba(15,23,42,0.04)] whitespace-pre-wrap"
+                className="max-w-[94%] rounded-[16px] rounded-tl-[8px] border border-[#dbe5f1] bg-white px-4 py-3 text-[13px] leading-[1.65] text-[#24405f] shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
               >
-                {message.content}
+                <div className="learning-markdown">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content}
+                  </ReactMarkdown>
+                </div>
               </div>
             ) : (
               <div
