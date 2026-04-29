@@ -31,6 +31,7 @@ type CanvasProps = {
   onUpdateNodeActivation: (id: string, activation: string) => void;
   onMoveNode: (id: string, index: number) => void;
   onDropBlock: (type: BlockType, index?: number) => void;
+  reserveBottomActionSpace?: boolean;
 };
 
 function getDroppedBlockType(event: DragEvent, fallback: BlockType | null) {
@@ -861,6 +862,7 @@ export function Canvas({
   onUpdateNodeActivation,
   onMoveNode,
   onDropBlock,
+  reserveBottomActionSpace = false,
 }: CanvasProps) {
   const stackRef = useRef<HTMLDivElement>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -886,8 +888,10 @@ export function Canvas({
   return (
     <main
       className={[
-        'ui-surface relative overflow-hidden bg-[linear-gradient(180deg,#f9fbff,#f4f8fd)]',
-        nodes.length === 0 ? 'min-h-0' : 'min-h-[clamp(840px,76vh,1240px)]',
+        'ui-surface relative bg-[linear-gradient(180deg,#f9fbff,#f4f8fd)]',
+        nodes.length === 0
+          ? 'min-h-0 overflow-hidden'
+          : 'min-h-[clamp(840px,76vh,1240px)] overflow-visible',
       ].join(' ')}
       data-tutorial-target="tutorial-builder-canvas"
     >
@@ -940,12 +944,21 @@ export function Canvas({
           onDropBlock(droppedBlock, insertionIndex);
         }}
         className={[
-          'relative flex flex-col items-center px-1.5 pb-10 pt-5 transition-colors sm:px-2.5 xl:px-3',
-          nodes.length === 0 ? 'min-h-0' : 'min-h-[clamp(860px,78vh,1280px)]',
+          'relative flex flex-col items-center px-1.5 pt-5 transition-colors sm:px-2.5 xl:px-3',
+          nodes.length === 0
+            ? 'min-h-0 pb-10'
+            : reserveBottomActionSpace
+              ? 'min-h-[clamp(860px,78vh,1280px)] pb-8'
+              : 'min-h-[clamp(860px,78vh,1280px)] pb-16',
           draggingBlock || draggingNodeId ? 'bg-primary/[0.03]' : '',
         ].join(' ')}
       >
-        <div className="relative w-full overflow-hidden rounded-[32px] border border-[#dbe5f1] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(247,250,253,0.96))] shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm">
+        <div
+          className={[
+            'relative w-full rounded-[32px] border border-[#dbe5f1] bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(247,250,253,0.96))] shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-sm',
+            nodes.length === 0 ? 'overflow-hidden' : 'overflow-visible',
+          ].join(' ')}
+        >
           <div className="border-b border-[#e2e8f0] px-[clamp(16px,1.2vw,22px)] py-[18px]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="ui-section-title">Builder Canvas</div>
@@ -1146,6 +1159,15 @@ export function Canvas({
             </div>
           </div>
         </div>
+        {nodes.length > 0 ? (
+          <div
+            aria-hidden="true"
+            className={[
+              'w-full shrink-0',
+              reserveBottomActionSpace ? 'h-[24rem]' : 'h-20',
+            ].join(' ')}
+          />
+        ) : null}
         {draggingBlock || draggingNodeId ? (
           <>
             <div className="pointer-events-none absolute inset-x-5 bottom-5 rounded-2xl border border-dashed border-primary/40 bg-white/88 px-4 py-3 text-center text-[14px] font-semibold text-primary shadow-[0_18px_40px_rgba(17,81,255,0.08)] backdrop-blur-md">

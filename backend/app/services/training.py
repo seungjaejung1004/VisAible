@@ -135,10 +135,14 @@ def _build_validation_challenge_samples(
     easy_count: int = 7,
     hard_count: int = 3,
 ) -> list[dict[str, object]]:
-    if dataset_id != "fashion_mnist":
+    if dataset_id not in {"fashion_mnist", "cifar10"}:
         return []
 
-    fixed_samples = _load_fixed_fashion_mnist_laundry_challenge()
+    fixed_samples = (
+        _load_fixed_fashion_mnist_laundry_challenge()
+        if dataset_id == "fashion_mnist"
+        else []
+    )
     if fixed_samples:
         return fixed_samples
 
@@ -1541,11 +1545,19 @@ def train_model(
     if trained_model_sink is not None:
         trained_model_sink(model, device, payload.datasetId)
 
+    challenge_easy_count = 7
+    challenge_hard_count = 3
+    if payload.datasetId == "cifar10" and not {"mixup", "cutmix"}.issubset(set(normalized_augmentations)):
+        challenge_easy_count = 5
+        challenge_hard_count = 5
+
     challenge_samples = _build_validation_challenge_samples(
         model=model,
         loader=validation_loader,
         device=device,
         dataset_id=payload.datasetId,
+        easy_count=challenge_easy_count,
+        hard_count=challenge_hard_count,
     )
 
     return {

@@ -19,6 +19,7 @@ type SidebarProps = {
   selectedTutorialLessonId?: string | null;
   selectedStock?: StockPreset | null;
   playgroundMode?: PlaygroundMode;
+  reserveBottomActionSpace?: boolean;
   onDatasetSelect: (datasetId: string) => void;
   onTutorialLessonSelect?: (lessonId: string) => void;
   onStockSelect?: (stock: StockPreset) => void;
@@ -69,9 +70,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'mlp-1-1',
     code: 'MLP 1-1',
-    title: 'Dense Warm-up / 첫 분류',
+    title: 'DNN 처음 해보기',
     track: 'MLP Track',
-    trackLabel: 'Dense Start',
+    trackLabel: '기초',
     datasetId: 'mnist',
     icon: 'layers',
     paletteClass: 'bg-[#edf3ff] text-[#2456c9]',
@@ -86,9 +87,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'mlp-1-2',
     code: 'MLP 1-2',
-    title: 'Hidden Layer Stack / 표현력 올리기',
+    title: 'DNN 표현력 올리기',
     track: 'MLP Track',
-    trackLabel: 'Depth Up',
+    trackLabel: '표현력',
     datasetId: 'mnist',
     icon: 'layers',
     paletteClass: 'bg-[#edf3ff] text-[#2456c9]',
@@ -103,9 +104,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'cnn-1-1',
     code: 'CNN 1-1',
-    title: 'Filter Starter / CNN 전환',
+    title: 'CNN 처음 해보기',
     track: 'CNN Track',
-    trackLabel: 'Conv Basics',
+    trackLabel: '기초',
     datasetId: 'fashion_mnist',
     icon: 'panel',
     paletteClass: 'bg-[#fff4ea] text-[#b95b16]',
@@ -120,9 +121,9 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'cnn-1-2',
     code: 'CNN 1-2',
-    title: 'Feature Builder / 깊은 CNN',
+    title: 'CNN 표현력 올리기',
     track: 'CNN Track',
-    trackLabel: 'Feature Map',
+    trackLabel: '표현력',
     datasetId: 'fashion_mnist',
     icon: 'panel',
     paletteClass: 'bg-[#fff4ea] text-[#b95b16]',
@@ -137,21 +138,28 @@ const tutorialLessons: TutorialLesson[] = [
   {
     id: 'cnn-1-3',
     code: 'CNN 1-3',
-    title: 'Augmentation Lab / 일반화',
+    title: '데이터증강 해보기',
     track: 'CNN Track',
-    trackLabel: 'Robustness',
+    trackLabel: '일반화',
     datasetId: 'cifar10',
     icon: 'flask',
     paletteClass: 'bg-[#ebfbf5] text-[#0b7d6f]',
     accentClassName: 'text-[#0b7d6f]',
-    summary: 'CNN이 과적합되는 순간을 잡아내고, 데이터 증강으로 더 튼튼한 시야를 만드는 실전 수업입니다.',
+    summary: '자동 앨범 분류기가 새 사진을 엉뚱한 앨범에 넣지 않도록, 데이터 증강으로 더 튼튼한 시야를 만드는 실전 수업입니다.',
     bullets: [
-      '같은 구조라도 데이터 다양성이 부족하면 검증 성능이 쉽게 흔들린다는 점을 확인합니다.',
-      'MixUp, CutMix 같은 증강이 왜 일반화 성능 개선에 연결되는지 실험적으로 이해합니다.',
-      '실전 이미지 분류에서는 모델 구조만큼 데이터 준비가 중요하다는 감각을 얻게 됩니다.',
+      '여행, 동물, 탈것 사진이 섞인 업로드함을 CNN이 자동 앨범으로 분류하는 상황을 다룹니다.',
+      '같은 구조라도 사진 구도와 배경이 조금만 바뀌면 검증 성능이 흔들린다는 점을 확인합니다.',
+      'MixUp, CutMix로 사진 분류기가 한 장면을 외우지 않고 더 넓은 분포를 보게 만듭니다.',
     ],
   },
 ];
+
+const blockTutorialTargets: Partial<Record<BlockType, string>> = {
+  linear: 'tutorial-linear-block',
+  cnn: 'tutorial-cnn-block',
+  pooling: 'tutorial-pooling-block',
+  dropout: 'tutorial-dropout-block',
+};
 
 export function Sidebar({
   selectedDatasetId,
@@ -163,6 +171,7 @@ export function Sidebar({
   selectedTutorialLessonId = null,
   selectedStock,
   playgroundMode = 'stock',
+  reserveBottomActionSpace = false,
   onDatasetSelect,
   onTutorialLessonSelect,
   onStockSelect,
@@ -254,8 +263,14 @@ export function Sidebar({
   return (
     <aside
       className={[
-        'ui-surface relative z-10 self-start flex min-w-0 flex-col gap-4 overflow-hidden px-5 py-5 lg:overflow-visible',
-        isRpsPlayground ? 'h-auto' : 'h-full',
+        'ui-surface relative z-10 self-start flex min-w-0 flex-col gap-4 px-5 py-5 lg:overflow-visible',
+        activeWorkspace !== 'playground' ? 'overflow-visible' : 'overflow-hidden',
+        activeWorkspace !== 'playground' ? 'h-auto lg:self-stretch' : isRpsPlayground ? 'h-auto' : 'h-full',
+        activeWorkspace !== 'playground'
+          ? reserveBottomActionSpace
+            ? 'lg:min-h-[calc(100vh_+_15.5rem)]'
+            : 'lg:min-h-[calc(100vh_-_2rem)]'
+          : '',
       ].join(' ')}
     >
       {activeWorkspace === 'builder' ? (
@@ -528,7 +543,7 @@ export function Sidebar({
       ) : null}
 
       {activeWorkspace !== 'playground' && (
-        <section className="grid w-full content-start gap-2 self-stretch lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        <section className="grid w-full content-start gap-2 self-stretch lg:sticky lg:top-4 lg:max-h-[calc(100vh_-_2rem)] lg:overflow-y-auto">
           <h2 className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#7f8ea6]">
             Block Library
           </h2>
@@ -542,7 +557,7 @@ export function Sidebar({
                     ? 'ui-amber-advice animate-amber-pulse ring-0'
                     : 'border-[#d9e2ef]',
                 ].join(' ')}
-                data-tutorial-target={block.id === 'linear' ? 'tutorial-linear-block' : undefined}
+                data-tutorial-target={blockTutorialTargets[block.id]}
               >
                 <div
                   className={[

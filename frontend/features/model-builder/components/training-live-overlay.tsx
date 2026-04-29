@@ -284,14 +284,17 @@ function renderToCanvas(
 }
 
 function FeatureMapPreview({
+  stage,
   inputImage,
   featureMap,
 }: {
+  stage: OverlayStage;
   inputImage: number[][] | null;
   featureMap: number[][] | null;
 }) {
   const inputRef = useRef<HTMLCanvasElement>(null);
   const featureMapRef = useRef<HTMLCanvasElement>(null);
+  const isLive = Boolean(featureMap);
 
   useEffect(() => {
     if (inputImage && inputRef.current) {
@@ -306,44 +309,79 @@ function FeatureMapPreview({
   }, [featureMap]);
 
   return (
-    <div className="grid h-full gap-3 rounded-[24px] border border-[rgba(129,149,188,0.14)] bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(245,248,255,0.92))] p-4 shadow-[0_18px_40px_rgba(13,27,51,0.08)]">
-      <div>
-        <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#7b8da9]">
-          Feature Map
+    <div className="relative isolate flex h-full min-h-[224px] flex-col overflow-hidden rounded-[26px] border border-[#dbe5f1] bg-white/88 p-4 shadow-[0_18px_42px_rgba(13,27,51,0.08)]">
+      <div className="pointer-events-none absolute inset-y-5 left-0 w-1 rounded-r-full bg-[linear-gradient(180deg,#f2b37d,#47bca9)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_90%_18%,rgba(71,188,169,0.10),transparent_34%)]" />
+
+      <div className="relative flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#8a9ab3]">
+            Feature Map
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <div className="truncate font-display text-[17px] font-bold tracking-[-0.03em] text-[#12213f]">
+              {stage.label}
+            </div>
+            <div className="shrink-0 rounded-full bg-[#f4f7fc] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#687a95]">
+              {stage.meta}
+            </div>
+          </div>
         </div>
-        <div className="mt-1 text-[13px] font-semibold leading-5 text-[#52637e]">
-          이 Conv 레이어가 현재 입력 이미지에서 잡아낸 대표 특징입니다.
+        <div
+          className={[
+            'shrink-0 rounded-full px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.16em]',
+            isLive
+              ? 'bg-[#e8fff7] text-[#0b7d6f]'
+              : 'bg-[#eef3ff] text-[#60738f]',
+          ].join(' ')}
+        >
+          {isLive ? 'Live' : 'Waiting'}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex h-full flex-col rounded-[18px] border border-[rgba(129,149,188,0.12)] bg-white p-3">
-          <div className="mb-2 text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#7b8da9]">
+
+      <div className="relative mt-3 grid min-h-0 flex-1 gap-3 md:grid-cols-2">
+        <div className="flex min-h-0 min-w-0 flex-col gap-2">
+          <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#8a9ab3]">
             Input
           </div>
-          <div className="flex-1 overflow-hidden rounded-[14px] bg-black">
-            <canvas
-              ref={inputRef}
-              className="h-full w-full object-contain"
-              style={{ imageRendering: 'pixelated' }}
-            />
-          </div>
-        </div>
-        <div className="flex h-full flex-col rounded-[18px] border border-[rgba(129,149,188,0.12)] bg-white p-3">
-          <div className="mb-2 text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#7b8da9]">
-            Activation
-          </div>
-          <div className="flex-1 overflow-hidden rounded-[14px] bg-white">
-            {featureMap ? (
-              <canvas
-                ref={featureMapRef}
-                className="h-full w-full object-contain"
-                style={{ imageRendering: 'pixelated' }}
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            <div className="relative aspect-square h-full max-h-[142px] max-w-full overflow-hidden rounded-[20px] bg-[#07101d] p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10)]">
+              {inputImage ? (
+                <canvas
+                  ref={inputRef}
+                  className="h-full w-full object-contain opacity-90"
+                  style={{ imageRendering: 'pixelated' }}
                 />
               ) : (
-                <div className="flex h-full items-center justify-center px-3 text-center text-[11px] font-semibold text-[#7b8da9]">
-                  학습이 시작되면 feature map이 여기에 나타납니다.
+                <div className="flex h-full items-center justify-center px-2 text-center text-[10px] font-semibold text-white/46">
+                  loading
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 min-w-0 flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#0b7d6f]">
+              Activation
+            </div>
+            <div className="h-px flex-1 bg-[linear-gradient(90deg,#dbe5f1,transparent)]" />
+          </div>
+          <div className="flex min-h-0 flex-1 items-center justify-center">
+            <div className="relative aspect-square h-full max-h-[142px] max-w-full overflow-hidden rounded-[20px] bg-[#07101d] p-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.10),0_12px_28px_rgba(13,27,51,0.10)]">
+              {featureMap ? (
+                <canvas
+                  ref={featureMapRef}
+                  className="h-full w-full object-contain"
+                  style={{ imageRendering: 'pixelated' }}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center px-3 text-center text-[11px] font-semibold text-white/52">
+                  학습 중 feature map이 여기에 나타납니다.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -353,6 +391,7 @@ function FeatureMapPreview({
 
 function StageFigure({ stage, isLast }: { stage: OverlayStage; isLast: boolean }) {
   const palette = stagePalette(stage.accent);
+  const isCnnStage = stage.kind === 'cnn';
   let visual: JSX.Element;
 
   if (stage.kind === 'cnn') {
@@ -423,27 +462,63 @@ function StageFigure({ stage, isLast }: { stage: OverlayStage; isLast: boolean }
   }
 
   return (
-    <div className="relative pl-7 transition-all">
+    <div className={['relative pl-7 transition-all', isCnnStage ? 'h-full' : ''].join(' ')}>
       {!isLast ? <div className="absolute bottom-[-40px] left-[17px] top-[60px] w-px bg-[linear-gradient(180deg,rgba(17,81,255,0.36),rgba(17,81,255,0.08))]" /> : null}
       <div className="absolute left-0 top-[50px] h-9 w-9 rounded-full border border-[rgba(17,81,255,0.12)] bg-white text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#315dc8] shadow-[0_12px_26px_rgba(13,27,51,0.08)] flex items-center justify-center">
         {isLast ? '✓' : ''}
       </div>
       <div 
         className={[
-          'rounded-[26px] border px-5 py-4 shadow-[0_20px_48px_rgba(13,27,51,0.08)] backdrop-blur-sm transition-all',
-          'border-[rgba(129,149,188,0.14)] bg-white/88'
+          'rounded-[26px] border shadow-[0_20px_48px_rgba(13,27,51,0.08)] backdrop-blur-sm transition-all',
+          isCnnStage
+            ? 'relative h-full min-h-[224px] overflow-hidden border-[#dbe5f1] bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_52%,#fff7ee_100%)] p-4'
+            : 'border-[rgba(129,149,188,0.14)] bg-white/88 px-5 py-4',
         ].join(' ')}
       >
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#7b8da9]">{stage.kind}</div>
-            <div className="mt-1.5 font-display text-[18px] font-bold leading-none text-[#12213f]">{stage.label}</div>
-          </div>
-          <div className="flex min-h-[88px] min-w-[98px] items-center justify-center">{visual}</div>
-        </div>
-        <div className="mt-3 inline-flex rounded-full bg-[#f3f6fd] px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#506587]">
-          {stage.meta}
-        </div>
+        {isCnnStage ? (
+          <>
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_88%_18%,rgba(242,179,125,0.18),transparent_32%),radial-gradient(circle_at_12%_82%,rgba(17,81,255,0.06),transparent_30%)]" />
+            <div className="relative flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-[#8a9ab3]">
+                  CNN Layer
+                </div>
+                <div className="mt-1.5 truncate font-display text-[21px] font-bold tracking-[-0.035em] text-[#12213f]">
+                  {stage.label}
+                </div>
+              </div>
+              <div className="shrink-0 rounded-full bg-white/90 px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#506587] shadow-[0_10px_22px_rgba(13,27,51,0.08)]">
+                {stage.meta}
+              </div>
+            </div>
+
+            <div className="relative mt-4 flex min-h-[136px] flex-1 items-center justify-center overflow-hidden rounded-[22px] border border-[#f2d7bf] bg-[linear-gradient(135deg,rgba(255,250,244,0.96),rgba(255,255,255,0.92))] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <div className="absolute left-5 top-5 grid grid-cols-3 gap-1.5 opacity-70">
+                {Array.from({ length: 9 }).map((_, index) => (
+                  <span
+                    key={`${stage.id}-kernel-${index}`}
+                    className="h-1.5 w-1.5 rounded-[3px] bg-[#f2b37d]"
+                  />
+                ))}
+              </div>
+              <div className="absolute inset-x-9 top-1/2 h-px bg-[linear-gradient(90deg,transparent,#f2b37d_18%,rgba(17,81,255,0.18)_72%,transparent)]" />
+              <div className="relative">{visual}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#7b8da9]">{stage.kind}</div>
+                <div className="mt-1.5 font-display text-[18px] font-bold leading-none text-[#12213f]">{stage.label}</div>
+              </div>
+              <div className="flex min-h-[88px] min-w-[98px] items-center justify-center">{visual}</div>
+            </div>
+            <div className="mt-3 inline-flex rounded-full bg-[#f3f6fd] px-3 py-1 text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#506587]">
+              {stage.meta}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -509,12 +584,13 @@ export function TrainingLiveOverlay({ dataset, nodes, trainingStatus, isAvailabl
                   key={stage.id}
                   className={[
                     'grid gap-4',
-                    stage.kind === 'cnn' ? 'xl:grid-cols-[minmax(280px,420px)_minmax(320px,1fr)] xl:items-stretch' : '',
+                    stage.kind === 'cnn' ? 'xl:min-h-[224px] xl:grid-cols-[minmax(280px,420px)_minmax(320px,1fr)] xl:items-stretch' : '',
                   ].join(' ')}
                 >
                   <StageFigure stage={stage} isLast={index === stages.length - 1} />
                   {stage.kind === 'cnn' ? (
                     <FeatureMapPreview
+                      stage={stage}
                       inputImage={trainingStatus?.convVizInput ?? null}
                       featureMap={trainingStatus?.convVisualizations?.[stage.id]?.featureMaps?.[0] ?? null}
                     />

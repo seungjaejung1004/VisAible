@@ -57,6 +57,25 @@ type ReactPdfComponents = {
   Page: ReactPdfModule['Page'];
 };
 
+const DEFAULT_PDF_PAGE_HEIGHT_RATIO = 420.9449 / 595.2756;
+
+type PracticeTarget = {
+  lessonId: string;
+  label: string;
+};
+
+function getPracticeTarget(chapterId: string): PracticeTarget | null {
+  if (chapterId === 'dnn-basics') {
+    return { lessonId: 'mlp-1-1', label: 'DNN 실습하러 가기' };
+  }
+
+  if (chapterId === 'cnn-basics') {
+    return { lessonId: 'cnn-1-1', label: 'CNN 배우러 가기' };
+  }
+
+  return null;
+}
+
 function fileToDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -213,9 +232,10 @@ function PdfSelectionViewer({
   onError: (message: string | null) => void;
   onCapture: (image: DroppedImage) => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
   const pageRefs = useRef<Record<number, HTMLDivElement | null>>({});
-  const [viewerWidth, setViewerWidth] = useState(720);
+  const [viewerSize, setViewerSize] = useState({ width: 720, height: 460 });
+  const [pageHeightRatio, setPageHeightRatio] = useState(DEFAULT_PDF_PAGE_HEIGHT_RATIO);
   const [pageCount, setPageCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectionDraft, setSelectionDraft] = useState<PdfSelectionDraft | null>(null);
@@ -226,6 +246,11 @@ function PdfSelectionViewer({
   const selectionBox = useMemo(() => getSelectionBox(selectionDraft), [selectionDraft]);
   const Document = pdfComponents?.Document;
   const Page = pdfComponents?.Page;
+  const fittedPageWidth = useMemo(() => {
+    const availableWidth = Math.max(140, viewerSize.width);
+    const availableHeight = Math.max(100, viewerSize.height);
+    return Math.floor(Math.max(120, Math.min(availableWidth, availableHeight / pageHeightRatio)));
+  }, [pageHeightRatio, viewerSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,17 +278,20 @@ function PdfSelectionViewer({
   }, [onError]);
 
   useEffect(() => {
-    const element = scrollRef.current;
+    const element = viewportRef.current;
     if (!element) {
       return;
     }
 
-    const updateWidth = () => {
-      setViewerWidth(Math.max(360, element.clientWidth - 8));
+    const updateSize = () => {
+      setViewerSize({
+        width: Math.max(360, element.clientWidth),
+        height: Math.max(260, element.clientHeight),
+      });
     };
 
-    updateWidth();
-    const observer = new ResizeObserver(updateWidth);
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
@@ -273,6 +301,7 @@ function PdfSelectionViewer({
     setCurrentPage(1);
     setSelectionDraft(null);
     setCapturedRegion(null);
+    setPageHeightRatio(DEFAULT_PDF_PAGE_HEIGHT_RATIO);
   }, [chapter.id]);
 
   const goToPage = (pageNumber: number) => {
@@ -280,7 +309,6 @@ function PdfSelectionViewer({
     setCurrentPage(nextPage);
     setSelectionDraft(null);
     setCapturedRegion(null);
-    scrollRef.current?.querySelector('[data-pdf-page-scroll]')?.scrollTo({ top: 0 });
   };
 
   const startSelection = (event: React.PointerEvent<HTMLDivElement>, pageNumber: number) => {
@@ -353,21 +381,18 @@ function PdfSelectionViewer({
   };
 
   return (
-    <div ref={scrollRef} className="learning-pdf-scroll grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-[#eef4ff]">
-      <div className="flex items-center justify-between gap-3 border-b border-[#dbe5f1] bg-white/82 px-4 py-3">
-        <div className="text-[12px] font-extrabold text-[#24405f]">
-          PDF Viewer
-        </div>
-        <div className="text-[11px] font-semibold text-[#60718a]">
-          페이지를 넘기면서 보고, 필요한 부분만 드래그해 캡처할 수 있습니다.
-        </div>
-      </div>
-
-      <div data-pdf-page-scroll className="min-h-0 overflow-auto px-3 py-3">
+    <div className="learning-pdf-scroll flex min-h-0 flex-col overflow-hidden bg-[#eef4ff]">
+      <div
+        ref={viewportRef}
+        data-pdf-page-scroll
+        className="grid w-full min-h-0 place-items-center overflow-hidden bg-[#eef4ff]"
+        style={{ aspectRatio: `${1 / pageHeightRatio}` }}
+      >
         {Document && Page ? (
           <Document
             key={chapter.id}
             file={pdfUrl}
+            className="grid h-full w-full min-h-0 place-items-center"
             loading={<div className="grid h-full min-h-0 place-items-center py-16 text-[13px] font-semibold text-[#60718a]">PDF를 렌더링하는 중입니다...</div>}
             error={<div className="grid h-full min-h-0 place-items-center px-6 py-16 text-center text-[13px] font-semibold text-[#b42318]">PDF를 렌더링하지 못했습니다. Open PDF로 원본을 열어주세요.</div>}
             onLoadSuccess={({ numPages }) => {
@@ -387,7 +412,7 @@ function PdfSelectionViewer({
                     ref={(element) => {
                       pageRefs.current[pageNumber] = element;
                     }}
-                    className="learning-pdf-page-shell relative mx-auto w-fit overflow-hidden rounded-[14px] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.11)]"
+                    className="learning-pdf-page-shell relative mx-auto w-fit overflow-hidden rounded-[12px] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.10)]"
                     onPointerDown={(event) => startSelection(event, pageNumber)}
                     onPointerMove={(event) => updateSelection(event, pageNumber)}
                     onPointerUp={(event) => void finishSelection(event, pageNumber)}
@@ -396,7 +421,19 @@ function PdfSelectionViewer({
                       setSelectionDraft(null);
                     }}
                   >
-                    <Page pageNumber={pageNumber} width={viewerWidth} renderAnnotationLayer={false} renderTextLayer />
+                    <Page
+                      pageNumber={pageNumber}
+                      width={fittedPageWidth}
+                      renderAnnotationLayer={false}
+                      renderTextLayer
+                      onLoadSuccess={(page) => {
+                        const viewport = page.getViewport({ scale: 1 });
+                        if (viewport.width > 0) {
+                          const nextRatio = viewport.height / viewport.width;
+                          setPageHeightRatio((current) => (Math.abs(current - nextRatio) > 0.001 ? nextRatio : current));
+                        }
+                      }}
+                    />
                     {activeBox ? (
                       <div
                         className="pointer-events-none absolute border-[3px] border-primary shadow-[0_0_0_1px_rgba(255,255,255,0.92)]"
@@ -431,12 +468,12 @@ function PdfSelectionViewer({
         )}
       </div>
 
-      <div className="sticky bottom-0 z-20 flex items-center justify-center gap-3 border-t border-[#dbe5f1] bg-white/95 px-4 py-3 backdrop-blur">
+      <div className="z-20 flex flex-wrap items-center justify-center gap-3 border-t border-[#dbe5f1] bg-white/95 px-4 py-2 backdrop-blur">
         <button
           type="button"
           disabled={currentPage <= 1}
           onClick={() => goToPage(currentPage - 1)}
-          className="rounded-[12px] border border-[#dbe5f1] bg-white px-4 py-2 text-[12px] font-extrabold text-[#24405f] shadow-[0_6px_16px_rgba(15,23,42,0.04)] disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-[12px] border border-[#dbe5f1] bg-white px-3.5 py-1.5 text-[12px] font-extrabold text-[#24405f] shadow-[0_6px_16px_rgba(15,23,42,0.04)] disabled:cursor-not-allowed disabled:opacity-45"
         >
           Prev
         </button>
@@ -447,7 +484,7 @@ function PdfSelectionViewer({
           type="button"
           disabled={pageCount === 0 || currentPage >= pageCount}
           onClick={() => goToPage(currentPage + 1)}
-          className="rounded-[12px] border border-[#dbe5f1] bg-white px-4 py-2 text-[12px] font-extrabold text-[#24405f] shadow-[0_6px_16px_rgba(15,23,42,0.04)] disabled:cursor-not-allowed disabled:opacity-45"
+          className="rounded-[12px] border border-[#dbe5f1] bg-white px-3.5 py-1.5 text-[12px] font-extrabold text-[#24405f] shadow-[0_6px_16px_rgba(15,23,42,0.04)] disabled:cursor-not-allowed disabled:opacity-45"
         >
           Next
         </button>
@@ -459,9 +496,11 @@ function PdfSelectionViewer({
 export function LearningWorkspace({
   requestedChapterId,
   onRequestedChapterHandled,
+  onGoToTutorial,
 }: {
   requestedChapterId?: string | null;
   onRequestedChapterHandled?: () => void;
+  onGoToTutorial?: (lessonId: string) => void;
 }) {
   const [chapters, setChapters] = useState<LearningChapterSummary[]>([]);
   const [activeChapterId, setActiveChapterId] = useState('');
@@ -476,6 +515,10 @@ export function LearningWorkspace({
   const [chatError, setChatError] = useState<string | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const activePdfUrl = activeChapter ? getLearningChapterPdfUrl(activeChapter.id, activeChapter.sourceUrl) : null;
+  const activePracticeTarget = useMemo(
+    () => (activeChapter ? getPracticeTarget(activeChapter.id) : null),
+    [activeChapter],
+  );
   const [messages, setMessages] = useState<LearningMessage[]>([
     {
       id: 'learning-assistant-intro',
@@ -732,28 +775,40 @@ export function LearningWorkspace({
         </div>
       </aside>
 
-      <main className="ui-surface grid h-full min-h-0 self-start grid-rows-[auto_minmax(0,1fr)] overflow-hidden px-3 py-3 xl:px-4">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e1e8f3] pb-3">
+      <main className="ui-surface grid h-full min-h-0 self-start grid-rows-[auto_minmax(0,1fr)] overflow-hidden px-3 py-2.5 xl:px-3.5">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e1e8f3] pb-2">
           <div className="min-w-0">
             <div className="ui-section-title">{activeChapter?.chapterLabel ?? 'PDF'}</div>
-            <h2 className="mt-1.5 font-display text-[25px] font-bold leading-tight text-[#10213b]">
+            <h2 className="mt-1 font-display text-[22px] font-bold leading-tight text-[#10213b]">
               {activeChapter?.title ?? 'Learning PDF'}
             </h2>
           </div>
-          {activeChapter?.sourceUrl ? (
-            <a
-              href={activeChapter.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-[14px] border border-[#dbe5f1] bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#24405f] shadow-[0_8px_18px_rgba(15,23,42,0.04)]"
-            >
-              <Icon name="file" className="h-4 w-4 text-primary" />
-              Open PDF
-            </a>
-          ) : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {activePracticeTarget && onGoToTutorial ? (
+              <button
+                type="button"
+                onClick={() => onGoToTutorial(activePracticeTarget.lessonId)}
+                className="inline-flex items-center gap-2 rounded-[15px] bg-[linear-gradient(135deg,#1151ff,#2f6cff)] px-4 py-2 text-[12px] font-black text-white shadow-[0_14px_28px_rgba(17,81,255,0.22)] transition hover:translate-y-[-1px] hover:shadow-[0_18px_34px_rgba(17,81,255,0.26)]"
+              >
+                <Icon name="rocket" className="h-4 w-4" />
+                {activePracticeTarget.label}
+              </button>
+            ) : null}
+            {activeChapter?.sourceUrl ? (
+              <a
+                href={activeChapter.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-[15px] border border-[#dbe5f1] bg-white px-3.5 py-2 text-[12px] font-extrabold text-[#24405f] shadow-[0_8px_18px_rgba(15,23,42,0.04)] transition hover:border-[#bdd0eb] hover:bg-[#f8fbff]"
+              >
+                <Icon name="file" className="h-4 w-4 text-primary" />
+                Open PDF
+              </a>
+            ) : null}
+          </div>
         </div>
 
-        <div className="mt-3 min-h-0 overflow-hidden rounded-[20px] border border-[#dbe5f1] bg-[#eef4ff]">
+        <div className="mt-2 w-full self-start overflow-hidden rounded-[20px] border border-[#dbe5f1] bg-[#eef4ff]">
           {loadingChapter ? (
             <div className="grid h-full min-h-0 place-items-center text-[13px] font-semibold text-[#60718a]">
               PDF를 불러오는 중입니다...

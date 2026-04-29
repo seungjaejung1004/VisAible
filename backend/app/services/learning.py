@@ -23,22 +23,22 @@ from app.services.mina import (
 LEARNING_CHAPTERS: dict[str, dict[str, str]] = {
     "ai-dataset": {
         "title": "Ai Basic",
-        "summary": "데이터셋의 역할, 구성 요소, train/validation/test 분리와 품질 기준을 살펴봅니다.",
-        "sourceLabel": "AI Dataset Chapter (PDF)",
+        "summary": "데이터셋을 모델 성능을 결정하는 설계 자산으로 보고, feature/label, 수집, 분할, 누수, 품질, 운영 드리프트까지 연결해 살펴봅니다.",
+        "sourceLabel": "AI Dataset Slides (PDF)",
         "sourceUrl": "/learning-pdfs/ai-dataset-chapter.pdf",
         "chapterLabel": "Dataset",
     },
     "dnn-basics": {
         "title": "DNN Chapter",
-        "summary": "DNN의 기본 개념, 층 구조, 표현 학습 흐름을 직접 읽으며 질문할 수 있습니다.",
-        "sourceLabel": "DNN Chapter (PDF)",
+        "summary": "완전연결 신경망을 함수 합성으로 읽고, neuron, layer, activation, loss, gradient, regularization의 학습 흐름을 정리합니다.",
+        "sourceLabel": "DNN Slides (PDF)",
         "sourceUrl": "/learning-pdfs/dnn-chapter.pdf",
         "chapterLabel": "DNN",
     },
     "cnn-basics": {
         "title": "CNN Chapter",
-        "summary": "CNN의 핵심 개념, convolution, feature map, pooling 흐름을 직접 읽으며 질문할 수 있습니다.",
-        "sourceLabel": "CNN Chapter (PDF)",
+        "summary": "이미지를 tensor로 유지한 채 local pattern을 찾는 CNN의 구조, convolution, feature map, pooling, classic architecture, transfer learning을 살펴봅니다.",
+        "sourceLabel": "CNN Slides (PDF)",
         "sourceUrl": "/learning-pdfs/cnn-chapter.pdf",
         "chapterLabel": "CNN",
     },
@@ -48,70 +48,70 @@ LEARNING_CHAPTERS: dict[str, dict[str, str]] = {
 LEARNING_SECTIONS: dict[str, list[dict[str, list[str] | str]]] = {
     "ai-dataset": [
         {
-            "heading": "데이터셋은 모델의 경험입니다",
+            "heading": "데이터셋은 모델의 학습 환경입니다",
             "paragraphs": [
-                "모델은 데이터셋에 들어 있는 샘플을 통해 패턴을 배웁니다. 그래서 어떤 샘플이 포함되는지, 클래스가 얼마나 균형 잡혀 있는지, 라벨이 정확한지가 성능에 직접 영향을 줍니다.",
-                "Learning 탭에서는 PDF의 표, 예시 그림, 설명 문장을 캡처해서 데이터셋 품질이나 분할 방식이 왜 중요한지 바로 질문할 수 있습니다.",
+                "모델은 데이터셋에 담긴 패턴, 결측, 편향, 라벨 기준까지 함께 배웁니다. 같은 알고리즘이라도 데이터 분포와 라벨 규칙이 바뀌면 성능과 실패 방식이 달라집니다.",
+                "데이터셋 설계는 단순히 파일을 모으는 일이 아니라 문제 정의, 수집 기준, 라벨링 규칙, 평가 기준을 함께 고정하는 실험 설계입니다.",
             ],
         },
         {
-            "heading": "train / validation / test 분리는 목적이 다릅니다",
+            "heading": "Feature와 Label은 문제 형식에 따라 달라집니다",
             "paragraphs": [
-                "train은 파라미터를 학습하는 용도이고, validation은 설정을 비교하는 용도이며, test는 최종 일반화 성능을 확인하는 용도입니다.",
-                "이 셋이 섞이면 모델이 실제보다 더 잘하는 것처럼 보일 수 있으므로, PDF에서 관련 설명을 볼 때도 누가 어떤 역할인지 구분해서 읽는 것이 중요합니다.",
+                "Feature는 모델에게 입력되는 설명 변수이고, label 또는 target은 모델이 맞춰야 하는 정답입니다. 표 데이터에서는 column이 feature가 되고, 이미지는 pixel grid와 channel이 feature가 됩니다.",
+                "분류, 회귀, 객체 탐지, 세그멘테이션처럼 문제 유형이 달라지면 label의 형태도 클래스 번호, 연속값, bounding box, pixel mask 등으로 달라집니다.",
             ],
         },
         {
-            "heading": "좋은 데이터는 양보다 구조가 중요합니다",
+            "heading": "분할, 누수, 품질은 평가 신뢰도를 결정합니다",
             "paragraphs": [
-                "샘플 수가 많아도 중복이 심하거나 편향이 크면 학습이 왜곡될 수 있습니다. 반대로 적절한 클래스 구성과 깨끗한 라벨을 갖춘 데이터는 훨씬 안정적인 학습을 만듭니다.",
-                "Builder에서 결과가 이상할 때는 모델 구조만 보지 말고 데이터셋의 대표성과 라벨 품질도 함께 의심해야 합니다.",
+                "train set은 weight를 학습하고, validation set은 모델 후보와 설정을 비교하며, test set은 마지막 일반화 성능 보고에만 사용해야 합니다.",
+                "데이터 누수, 중복 샘플, 불균형, 라벨 오류, 대표성 부족은 점수를 실제보다 좋게 보이게 하거나 배포 후 성능 하락을 만듭니다. 운영 중에는 데이터 드리프트도 계속 점검해야 합니다.",
             ],
         },
     ],
     "dnn-basics": [
         {
-            "heading": "Supervised learning의 기본 루프",
+            "heading": "DNN은 여러 함수의 합성입니다",
             "paragraphs": [
-                "입력 x와 정답 y의 관계를 모델이 함수처럼 근사하도록 만드는 흐름입니다. VisAible Builder에서는 데이터셋 선택, 레이어 구성, loss 계산, optimizer 업데이트가 이 루프를 이룹니다.",
-                "처음에는 정확한 수식보다 데이터가 어떤 모양으로 들어오고 어떤 출력으로 나와야 하는지 보는 것이 중요합니다.",
+                "한 층은 affine transform과 activation으로 구성되고, 깊은 네트워크는 이런 층을 여러 번 합성한 함수입니다.",
+                "선형 모델은 feature의 가중합을 기반으로 판단하지만, DNN은 layer를 거치며 입력을 더 유용한 중간 표현으로 바꿉니다.",
             ],
         },
         {
-            "heading": "모델은 표현을 쌓는 구조입니다",
+            "heading": "Neuron과 Layer는 행렬 연산으로 계산됩니다",
             "paragraphs": [
-                "Linear layer나 CNN layer는 입력을 더 유용한 표현으로 바꾸는 단계입니다. 여러 층을 쌓는 이유는 단순 픽셀에서 점점 더 추상적인 패턴을 만들기 위해서입니다.",
-                "레이어를 추가할수록 표현력은 커지지만, 데이터와 regularization이 부족하면 과적합도 같이 커질 수 있습니다.",
+                "뉴런은 입력 vector와 weight의 내적에 bias를 더하고 activation function을 통과시킵니다. bias는 decision boundary의 위치를 이동시키는 역할을 합니다.",
+                "실제 DNN은 뉴런을 하나씩 계산하지 않고 batch와 weight matrix의 곱으로 처리합니다. GPU는 이런 큰 행렬 곱을 병렬로 빠르게 계산합니다.",
             ],
         },
         {
-            "heading": "Loss는 학습의 방향 신호입니다",
+            "heading": "Loss, Gradient, Regularization이 학습을 움직입니다",
             "paragraphs": [
-                "Loss는 현재 예측이 정답과 얼마나 다른지 숫자로 보여줍니다. 학습은 이 숫자를 줄이는 방향으로 파라미터를 조금씩 움직이는 과정입니다.",
-                "그래프에서 loss가 내려가는데 validation accuracy가 멈춘다면, 모델이 훈련 데이터에만 익숙해지고 있을 가능성을 같이 봐야 합니다.",
+                "Loss는 모델 출력이 정답과 얼마나 다른지 수치화하고, backpropagation은 chain rule로 각 parameter가 loss에 준 영향을 계산합니다.",
+                "Learning rate는 gradient 반대 방향으로 움직이는 보폭입니다. train loss와 validation loss를 함께 보고 overfitting, underfitting, scale 문제, label 문제를 분리해서 해석해야 합니다.",
             ],
         },
     ],
     "cnn-basics": [
         {
-            "heading": "CNN은 공간 구조를 읽습니다",
+            "heading": "CNN은 이미지의 공간 구조를 유지합니다",
             "paragraphs": [
-                "CNN은 작은 필터를 이미지 전체에 반복 적용하면서 edge, texture, shape 같은 지역 패턴을 찾아냅니다.",
-                "같은 가중치를 위치별로 공유하기 때문에, 완전연결층만 쓰는 구조보다 이미지 분류에 더 자연스럽게 맞습니다.",
+                "이미지는 H×W×C tensor이며, CNN은 이 위치와 channel 구조를 유지한 채 학습합니다. 이미지를 긴 vector로 펼치는 완전연결망보다 parameter를 훨씬 효율적으로 씁니다.",
+                "Local receptive field는 작은 영역을 반복해서 보며, 같은 filter를 모든 위치에서 공유해 edge, texture, part, object를 단계적으로 학습합니다.",
             ],
         },
         {
-            "heading": "Feature map은 중간 표현입니다",
+            "heading": "Convolution과 Feature Map은 패턴 위치를 기록합니다",
             "paragraphs": [
-                "각 convolution 결과는 입력 이미지에서 어떤 패턴이 어디서 강하게 반응했는지 보여주는 feature map이 됩니다.",
-                "층이 깊어질수록 단순 선분보다 더 복잡한 조합을 인식하게 되고, 그 정보가 뒤쪽 분류기로 전달됩니다.",
+                "Convolution filter는 입력 patch와 내적해 하나의 출력 값을 만들고, 이 값을 위치별로 모으면 feature map이 됩니다.",
+                "앞쪽 layer의 filter는 edge, corner, 색 대비처럼 낮은 수준의 패턴에 반응하고, 깊어질수록 receptive field가 넓어져 더 복합적인 구조를 봅니다.",
             ],
         },
         {
-            "heading": "Pooling은 정보를 압축합니다",
+            "heading": "Pooling, Augmentation, Transfer Learning은 실전 성능을 좌우합니다",
             "paragraphs": [
-                "Pooling은 중요한 반응을 남기면서 feature map 크기를 줄여 계산량을 낮추고 작은 위치 변화에 덜 민감하게 만듭니다.",
-                "다만 너무 과하게 줄이면 세부 정보가 사라질 수 있으므로 convolution 층과 균형 있게 사용해야 합니다.",
+                "Pooling은 중요한 activation을 남기면서 공간 크기를 줄이고 작은 위치 변화에 덜 민감하게 만듭니다. Global average pooling은 마지막 feature map을 class score로 연결할 때 자주 사용됩니다.",
+                "이미지 모델은 배경 shortcut, 조명, 해상도, 포즈 변화에 취약할 수 있습니다. Data augmentation과 pretrained backbone을 이용한 transfer learning은 작은 데이터셋에서 특히 중요합니다.",
             ],
         },
     ],

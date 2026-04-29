@@ -7,7 +7,7 @@ import { extractMnistPixels } from '@/lib/mnist-canvas';
 import type { DatasetItem, TrainingChallengeSample, TrainingJobStatus } from '@/types/builder';
 
 type MnistElevatorMissionProps = {
-  variant?: 'elevator' | 'laundry';
+  variant?: 'elevator' | 'laundry' | 'album';
   dataset?: DatasetItem | null;
   phase: 'intro' | 'mission' | 'complete';
   trainingStatus: TrainingJobStatus | null;
@@ -53,6 +53,7 @@ const EMPTY_CLASS_LABELS: string[] = [];
 const EMPTY_CHALLENGE_SAMPLES: TrainingChallengeSample[] = [];
 
 const LAUNDRY_PASS_COUNT = 7;
+const ALBUM_PASS_COUNT = 7;
 const FIXED_LAUNDRY_VARIANTS: LaundrySampleVariant[] = [
   { targetIndex: 6, dx: -2, dy: 1, scale: 0.94, rotateDeg: -6 },
   { targetIndex: 0, dx: 1, dy: -1, scale: 0.96, rotateDeg: 5 },
@@ -64,6 +65,18 @@ const FIXED_LAUNDRY_VARIANTS: LaundrySampleVariant[] = [
   { targetIndex: 4, dx: 1, dy: 1, scale: 0.91, rotateDeg: -4 },
   { targetIndex: 0, dx: -1, dy: 0, scale: 0.94, rotateDeg: -3 },
   { targetIndex: 2, dx: 1, dy: -2, scale: 0.9, rotateDeg: 3 },
+];
+const FIXED_ALBUM_VARIANTS: LaundrySampleVariant[] = [
+  { targetIndex: 3, dx: -2, dy: 1, scale: 0.94, rotateDeg: -5 },
+  { targetIndex: 5, dx: 2, dy: -1, scale: 0.95, rotateDeg: 6 },
+  { targetIndex: 1, dx: -1, dy: 2, scale: 0.93, rotateDeg: -4 },
+  { targetIndex: 9, dx: 2, dy: 0, scale: 0.92, rotateDeg: 5 },
+  { targetIndex: 0, dx: -2, dy: -1, scale: 0.91, rotateDeg: -6 },
+  { targetIndex: 8, dx: 1, dy: 1, scale: 0.94, rotateDeg: 4 },
+  { targetIndex: 2, dx: 0, dy: 2, scale: 0.9, rotateDeg: -3 },
+  { targetIndex: 4, dx: 1, dy: -2, scale: 0.91, rotateDeg: 5 },
+  { targetIndex: 7, dx: -1, dy: 1, scale: 0.92, rotateDeg: -5 },
+  { targetIndex: 6, dx: 2, dy: -1, scale: 0.93, rotateDeg: 3 },
 ];
 
 const missionFloors = [9, 8, 7, 6, 5, 4, 3, 2, 1];
@@ -103,6 +116,35 @@ const laundryIntroScenes: DialogueScene[] = [
   },
 ];
 
+const albumIntroScenes: DialogueScene[] = [
+  {
+    name: 'Cloud Album',
+    role: 'Broadcast',
+    text: 'VisAible Cloud Album의 자동 정리기가 멈췄습니다. 업로드된 사진들이 동물, 탈것, 야외 장면 앨범으로 나뉘지 못하고 한 폴더에 섞이고 있어요.',
+  },
+  {
+    name: 'Mina',
+    role: 'Maintenance AI',
+    text: '사진은 옷보다 더 변수가 많아. 같은 고양이라도 각도, 배경, 밝기가 다르고 자동차도 트럭과 자주 헷갈려. 그래서 이번에는 새 사진에도 버티는 CNN이 필요해.',
+  },
+  {
+    name: 'Mina',
+    role: 'Mission Brief',
+    text: 'CIFAR-10 사진을 읽는 CNN을 직접 쌓고, 필요하면 MixUp과 CutMix로 데이터 분포를 넓혀줘. 분류기가 충분히 안정되면 사진들이 다시 맞는 앨범으로 자동 정리될 거야.',
+  },
+];
+
+function parseInputShape(inputShape?: string | null) {
+  const [channels, height, width] =
+    inputShape?.split('x').map((value) => Number(value.trim())) ?? [1, 28, 28];
+
+  return {
+    channels: Number.isFinite(channels) && channels > 0 ? channels : 1,
+    height: Number.isFinite(height) && height > 0 ? height : 28,
+    width: Number.isFinite(width) && width > 0 ? width : 28,
+  };
+}
+
 function randomFloor() {
   return missionFloors[Math.floor(Math.random() * missionFloors.length)] ?? 5;
 }
@@ -129,8 +171,7 @@ function randomIndex(length: number) {
 }
 
 async function extractSamplePixels(imageSrc: string, dataset: DatasetItem): Promise<number[]> {
-  const [channels, height, width] =
-    dataset.inputShape?.split('x').map((value) => Number(value.trim())) ?? [1, 28, 28];
+  const { channels, height, width } = parseInputShape(dataset.inputShape);
 
   const image = new Image();
   image.src = imageSrc;
@@ -158,7 +199,7 @@ async function extractSamplePixels(imageSrc: string, dataset: DatasetItem): Prom
   }
 
   const pixels: number[] = [];
-  for (let channel = 0; channel < 3; channel += 1) {
+  for (let channel = 0; channel < Math.min(channels, 3); channel += 1) {
     for (let index = 0; index < width * height; index += 1) {
       pixels.push(data[index * 4 + channel] / 255);
     }
@@ -166,8 +207,9 @@ async function extractSamplePixels(imageSrc: string, dataset: DatasetItem): Prom
   return pixels;
 }
 
-function pixelsToImageSrc(pixels: number[], width = 28, height = 28): string | null {
-  if (typeof document === 'undefined' || pixels.length !== width * height) {
+function pixelsToImageSrc(pixels: number[], width = 28, height = 28, channels = 1): string | null {
+  const expectedLength = width * height * channels;
+  if (typeof document === 'undefined' || pixels.length !== expectedLength) {
     return null;
   }
 
@@ -180,12 +222,24 @@ function pixelsToImageSrc(pixels: number[], width = 28, height = 28): string | n
   }
 
   const imageData = context.createImageData(width, height);
-  for (let index = 0; index < pixels.length; index += 1) {
-    const value = Math.max(0, Math.min(255, Math.round(pixels[index] * 255)));
+  for (let index = 0; index < width * height; index += 1) {
     const offset = index * 4;
-    imageData.data[offset] = value;
-    imageData.data[offset + 1] = value;
-    imageData.data[offset + 2] = value;
+    if (channels === 1) {
+      const value = Math.max(0, Math.min(255, Math.round(pixels[index] * 255)));
+      imageData.data[offset] = value;
+      imageData.data[offset + 1] = value;
+      imageData.data[offset + 2] = value;
+    } else {
+      imageData.data[offset] = Math.max(0, Math.min(255, Math.round(pixels[index] * 255)));
+      imageData.data[offset + 1] = Math.max(
+        0,
+        Math.min(255, Math.round(pixels[width * height + index] * 255)),
+      );
+      imageData.data[offset + 2] = Math.max(
+        0,
+        Math.min(255, Math.round(pixels[width * height * 2 + index] * 255)),
+      );
+    }
     imageData.data[offset + 3] = 255;
   }
   context.putImageData(imageData, 0, 0);
@@ -197,8 +251,7 @@ async function buildLaundrySampleAsset(
   dataset: DatasetItem,
   variant: LaundrySampleVariant,
 ): Promise<{ imageSrc: string; pixels: number[] }> {
-  const [channels, height, width] =
-    dataset.inputShape?.split('x').map((value) => Number(value.trim())) ?? [1, 28, 28];
+  const { channels, height, width } = parseInputShape(dataset.inputShape);
 
   const image = new Image();
   image.src = imageSrc;
@@ -236,7 +289,11 @@ async function buildLaundrySampleAsset(
             255
           );
         })
-      : Array.from({ length: width * height * channels }, (_, index) => rendered.data[index] / 255);
+      : Array.from({ length: width * height * channels }, (_, index) => {
+          const channel = Math.floor(index / (width * height));
+          const pixelIndex = index % (width * height);
+          return rendered.data[pixelIndex * 4 + channel] / 255;
+        });
 
   return {
     imageSrc: canvas.toDataURL('image/png'),
@@ -346,13 +403,30 @@ export function MnistElevatorMission({
   const [sceneIndex, setSceneIndex] = useState(0);
 
   const isLaundryVariant = variant === 'laundry';
+  const isAlbumVariant = variant === 'album';
+  const isSampleMissionVariant = isLaundryVariant || isAlbumVariant;
+  const sampleMissionDatasetId = isAlbumVariant ? 'cifar10' : 'fashion_mnist';
+  const sampleMissionPassCount = isAlbumVariant ? ALBUM_PASS_COUNT : LAUNDRY_PASS_COUNT;
+  const sampleMissionVariants = isAlbumVariant ? FIXED_ALBUM_VARIANTS : FIXED_LAUNDRY_VARIANTS;
+  const sampleMissionIntroScenes = isAlbumVariant ? albumIntroScenes : laundryIntroScenes;
+  const sampleMissionNoun = isAlbumVariant ? '사진' : '세탁물';
+  const sampleMissionSystemName = isAlbumVariant ? '앨범 분류기' : '세탁 분류기';
+  const sampleMissionActionLabel = isAlbumVariant ? '사진 분류하기' : '빨래 분류하기';
+  const sampleMissionPredictingLabel = isAlbumVariant ? '앨범 찾는 중...' : '분류 중...';
+  const sampleMissionBoardLabel = isAlbumVariant ? 'Photo Board' : 'Evaluation Board';
+  const sampleMissionInputLabel = isAlbumVariant ? 'Album Photo Input' : 'Laundry Item Input';
+  const sampleMissionCurrentInputLabel = isAlbumVariant ? 'Current Photo Input' : 'Current Laundry Input';
+  const sampleMissionRequestLabel = isAlbumVariant ? 'Album Request' : 'Laundry Request';
+  const sampleMissionStatusLabel = isAlbumVariant ? 'Album Status' : 'Sorter Status';
+  const sampleMissionReadyLabel = isAlbumVariant ? 'Album AI Ready' : 'Sorter Ready';
+  const sampleMissionNotEnoughLabel = isAlbumVariant ? 'Needs More Generalization' : 'Still Not Enough';
   const lastMetric = trainingStatus?.metrics?.at(-1) ?? null;
   const isMissionReady =
     trainingStatus?.status === 'completed' &&
-    trainingStatus.datasetId === (isLaundryVariant ? 'fashion_mnist' : 'mnist') &&
+    trainingStatus.datasetId === (isSampleMissionVariant ? sampleMissionDatasetId : 'mnist') &&
     !!trainingStatus.jobId;
-  const currentScene = (isLaundryVariant ? laundryIntroScenes : introScenes)[sceneIndex] ??
-    (isLaundryVariant ? laundryIntroScenes[0] : introScenes[0]);
+  const activeIntroScenes = isSampleMissionVariant ? sampleMissionIntroScenes : introScenes;
+  const currentScene = activeIntroScenes[sceneIndex] ?? activeIntroScenes[0];
   const sampleClasses = useMemo(
     () => dataset?.sampleClasses ?? EMPTY_SAMPLE_CLASSES,
     [dataset?.sampleClasses],
@@ -374,25 +448,26 @@ export function MnistElevatorMission({
     [activeChallengeSamples],
   );
   const challengeLaundryAssets = useMemo(() => {
-    if (!isLaundryVariant || activeChallengeSamples.length === 0) {
+    if (!isSampleMissionVariant || activeChallengeSamples.length === 0) {
       return [];
     }
 
+    const { channels, height, width } = parseInputShape(dataset?.inputShape);
     return activeChallengeSamples.map((sample, index) => ({
       targetIndex: sample.targetIndex,
       label:
         classLabels[sample.targetIndex] ??
         sampleClasses[sample.targetIndex]?.label ??
         `Item ${index + 1}`,
-      imageSrc: pixelsToImageSrc(sample.pixels),
+      imageSrc: pixelsToImageSrc(sample.pixels, width, height, channels),
       pixels: sample.pixels,
     })) satisfies LaundrySampleAsset[];
-  }, [activeChallengeSamples, classLabels, isLaundryVariant, sampleClasses]);
+  }, [activeChallengeSamples, classLabels, dataset?.inputShape, isSampleMissionVariant, sampleClasses]);
   const selectedSample = sampleClasses[selectedSampleIndex] ?? sampleClasses[0] ?? null;
   const currentLaundryTargetIndex = laundryTargets[laundryRoundIndex] ?? targetSampleIndex;
   const targetSample = sampleClasses[currentLaundryTargetIndex] ?? sampleClasses[0] ?? null;
   const currentLaundryAsset = (challengeLaundryAssets[laundryRoundIndex] ?? laundrySampleAssets[laundryRoundIndex]) ?? null;
-  const currentLaundryInput = isLaundryVariant ? currentLaundryAsset : selectedSample;
+  const currentLaundryInput = isSampleMissionVariant ? currentLaundryAsset : selectedSample;
   const portraitSrc = useMemo(() => {
     if (phase === 'complete' || isMissionComplete) {
       return '/images/mnist-quest-mina-happy.svg';
@@ -405,7 +480,7 @@ export function MnistElevatorMission({
       return '/images/mnist-quest-mina-focused.svg';
     }
 
-    if (isLaundryVariant ? samplePredictError : predictError) {
+    if (isSampleMissionVariant ? samplePredictError : predictError) {
       return '/images/mnist-quest-mina-worried.svg';
     }
 
@@ -414,7 +489,7 @@ export function MnistElevatorMission({
     }
 
     return '/images/mnist-quest-mina-worried.svg';
-  }, [isLaundryVariant, isMissionComplete, isMissionReady, phase, predictError, samplePredictError, sceneIndex]);
+  }, [isSampleMissionVariant, isMissionComplete, isMissionReady, phase, predictError, samplePredictError, sceneIndex]);
   const expressionLabel = useMemo(() => {
     if (phase === 'complete' || isMissionComplete) {
       return 'Relieved';
@@ -424,12 +499,12 @@ export function MnistElevatorMission({
       return 'Alarmed';
     }
 
-    if (isLaundryVariant ? samplePredictError : predictError) {
+    if (isSampleMissionVariant ? samplePredictError : predictError) {
       return 'Concerned';
     }
 
     return 'Focused';
-  }, [isLaundryVariant, isMissionComplete, phase, predictError, samplePredictError, sceneIndex]);
+  }, [isSampleMissionVariant, isMissionComplete, phase, predictError, samplePredictError, sceneIndex]);
   const isCompactResultLayout = true;
 
   useEffect(() => {
@@ -454,7 +529,7 @@ export function MnistElevatorMission({
     }
     missionInitKeyRef.current = missionInitKey;
 
-    if (isLaundryVariant) {
+    if (isSampleMissionVariant) {
       let cancelled = false;
 
       void (async () => {
@@ -486,13 +561,13 @@ export function MnistElevatorMission({
 
         const nextTargets =
           sampleClasses.length >= 10
-            ? FIXED_LAUNDRY_VARIANTS.map((variant) => variant.targetIndex)
+            ? sampleMissionVariants.map((variant) => variant.targetIndex)
             : Array.from({ length: 10 }, () => randomIndex(sampleClasses.length));
 
         const nextAssets =
           dataset && sampleClasses.length >= 10
             ? await Promise.all(
-                FIXED_LAUNDRY_VARIANTS.map(async (variant) => {
+                sampleMissionVariants.map(async (variant) => {
                   const sample = sampleClasses[variant.targetIndex];
                   if (!sample?.imageSrc) {
                     return {
@@ -561,15 +636,16 @@ export function MnistElevatorMission({
     dataset,
     activeChallengeSamples,
     activeChallengeKey,
-    isLaundryVariant,
+    isSampleMissionVariant,
     isMissionReady,
     sampleClasses,
     sampleClasses.length,
+    sampleMissionVariants,
     trainingStatus?.jobId,
   ]);
 
   useEffect(() => {
-    if (isLaundryVariant) {
+    if (isSampleMissionVariant) {
       return;
     }
 
@@ -593,25 +669,29 @@ export function MnistElevatorMission({
     context.lineCap = 'round';
     context.lineJoin = 'round';
     context.strokeStyle = '#ffffff';
-  }, [isLaundryVariant, isMissionReady]);
+  }, [isSampleMissionVariant, isMissionReady]);
 
   const missionDialogue = useMemo(() => {
-    if (isLaundryVariant) {
+    if (isSampleMissionVariant) {
       if (phase === 'complete' || isMissionComplete) {
-        return '좋아! 세탁소 분류 코어가 복구돼서 의류가 다시 종류별로 자동 분류되기 시작했어.';
+        return isAlbumVariant
+          ? '좋아! 앨범 분류 코어가 복구돼서 사진들이 다시 동물, 탈것, 풍경 앨범으로 자동 정리되기 시작했어.'
+          : '좋아! 세탁소 분류 코어가 복구돼서 의류가 다시 종류별로 자동 분류되기 시작했어.';
       }
 
       if (!isMissionReady) {
-        return '아직 분류 코어가 비어 있어. 왼쪽에서 CNN 블록을 쌓고 Start 버튼으로 학습을 시작하면 세탁소 콘솔이 활성화될 거야.';
+        return isAlbumVariant
+          ? '아직 앨범 분류 코어가 비어 있어. 왼쪽에서 CNN 블록을 하나씩 쌓고 Start 버튼으로 학습하면 앨범 콘솔이 활성화될 거야.'
+          : '아직 분류 코어가 비어 있어. 왼쪽에서 CNN 블록을 쌓고 Start 버튼으로 학습을 시작하면 세탁소 콘솔이 활성화될 거야.';
       }
 
       if (laundryAttemptFinished) {
-        return laundryCorrectCount >= LAUNDRY_PASS_COUNT
-          ? `좋아! 총 10개 중 ${laundryCorrectCount}개를 맞혔어. 이제 세탁소 분류 라인을 다시 가동할 수 있어.`
-          : `총 10개 중 ${laundryCorrectCount}개만 맞혔어. 적어도 ${LAUNDRY_PASS_COUNT}개는 맞혀야 세탁소 라인을 다시 맡길 수 있어.`;
+        return laundryCorrectCount >= sampleMissionPassCount
+          ? `좋아! 총 10개 중 ${laundryCorrectCount}개를 맞혔어. 이제 ${sampleMissionSystemName}를 다시 맡길 수 있어.`
+          : `총 10개 중 ${laundryCorrectCount}개만 맞혔어. 적어도 ${sampleMissionPassCount}개는 맞혀야 ${sampleMissionSystemName}를 다시 맡길 수 있어.`;
       }
 
-      return `이번 평가는 총 10개의 세탁물을 순서대로 검사합니다. 현재 ${laundryRoundIndex + 1}번째 세탁물이 입력으로 들어왔어. 빨래 분류하기 버튼으로 분류 결과를 확인해보자.`;
+      return `이번 평가는 총 10개의 ${sampleMissionNoun}을 순서대로 검사합니다. 현재 ${laundryRoundIndex + 1}번째 ${sampleMissionNoun}이 입력으로 들어왔어. ${sampleMissionActionLabel} 버튼으로 결과를 확인해보자.`;
     }
 
     if (phase === 'complete' || isMissionComplete) {
@@ -623,60 +703,100 @@ export function MnistElevatorMission({
     }
 
     return `좋아, 지금 승객이 ${targetFloor}층을 요청했어. 캔버스에 ${targetFloor}를 손글씨로 적고 Predict Floor를 눌러. 이번엔 절대 틀리면 안 돼!`;
-  }, [isLaundryVariant, isMissionComplete, isMissionReady, laundryAttemptFinished, laundryCorrectCount, laundryRoundIndex, phase, targetFloor, targetSample?.label]);
+  }, [
+    isAlbumVariant,
+    isSampleMissionVariant,
+    isMissionComplete,
+    isMissionReady,
+    laundryAttemptFinished,
+    laundryCorrectCount,
+    laundryRoundIndex,
+    phase,
+    sampleMissionActionLabel,
+    sampleMissionNoun,
+    sampleMissionPassCount,
+    sampleMissionSystemName,
+    targetFloor,
+  ]);
   const clampedCurrentFloor = Math.max(1, Math.min(currentFloor, 9));
   const displayedCurrentFloor = invalidPredictionFloor === null ? clampedCurrentFloor : null;
   const elevatorCarHeight = 40;
   const elevatorVisualOffset = 4;
-  const activeError = isLaundryVariant ? samplePredictError : predictError;
-  const activePrediction = isLaundryVariant ? samplePrediction : prediction;
+  const activeError = isSampleMissionVariant ? samplePredictError : predictError;
+  const activePrediction = isSampleMissionVariant ? samplePrediction : prediction;
   const resolvedActiveMissionFloor =
-    !isLaundryVariant && activePrediction
+    !isSampleMissionVariant && activePrediction
       ? resolveMissionFloor(activePrediction.predictedLabel, classLabels)
       : null;
   const laundryBackgroundImage =
-    phase === 'complete' || isMissionComplete
+    isAlbumVariant
+      ? '/images/tutorial/album-classifier.png'
+      : phase === 'complete' || isMissionComplete
       ? '/images/tutorial/laundry-normal.png'
       : '/images/tutorial/laundry-error.png';
-  const scenarioEpisodeLabel = isLaundryVariant ? 'Episode 02' : 'Episode 01';
-  const consoleEyebrow = isLaundryVariant ? 'Laundry Sorting Console' : 'Elevator Control Console';
-  const introBadgeLabel = isLaundryVariant ? 'Laundry Alert' : scenarioEpisodeLabel;
-  const leftQuestLabel = isLaundryVariant
+  const scenarioEpisodeLabel = isAlbumVariant ? 'Episode 03' : isLaundryVariant ? 'Episode 02' : 'Episode 01';
+  const consoleEyebrow = isAlbumVariant
+    ? 'Cloud Album Console'
+    : isLaundryVariant
+      ? 'Laundry Sorting Console'
+      : 'Elevator Control Console';
+  const introBadgeLabel = isAlbumVariant ? 'Album Alert' : isLaundryVariant ? 'Laundry Alert' : scenarioEpisodeLabel;
+  const leftQuestLabel = isSampleMissionVariant
     ? phase === 'complete'
-      ? 'Sorting Restored'
-      : 'Laundry Mission'
+      ? isAlbumVariant
+        ? 'Album Restored'
+        : 'Sorting Restored'
+      : isAlbumVariant
+        ? 'Album Mission'
+        : 'Laundry Mission'
     : phase === 'complete'
       ? 'Quest Cleared'
       : 'Active Quest';
-  const leftExpressionLabel = isLaundryVariant ? 'Sorter Mood' : 'Expression';
+  const leftExpressionLabel = isSampleMissionVariant
+    ? isAlbumVariant
+      ? 'Album AI Mood'
+      : 'Sorter Mood'
+    : 'Expression';
   const consoleTitle =
     phase === 'complete'
-      ? isLaundryVariant
-        ? '세탁 분류 복구 보고'
+      ? isSampleMissionVariant
+        ? isAlbumVariant
+          ? '앨범 분류 복구 보고'
+          : '세탁 분류 복구 보고'
         : '임무 완료 보고'
-      : isLaundryVariant
-        ? '세탁물 분류 미션'
+      : isSampleMissionVariant
+        ? isAlbumVariant
+          ? '자동 앨범 분류 미션'
+          : '세탁물 분류 미션'
         : '층수 인식 미션';
   const topBadgeLabel =
     phase === 'complete'
       ? 'Quest Cleared'
       : isMissionReady
-        ? isLaundryVariant
-          ? '10-item check'
+        ? isSampleMissionVariant
+          ? isAlbumVariant
+            ? '10-photo check'
+            : '10-item check'
           : `Target ${targetFloor}F`
         : 'Training Required';
-  const topMetricLabel = isLaundryVariant ? 'Target Item' : 'Target Floor';
-  const topMetricValue = isLaundryVariant ? '10 items' : `${targetFloor}F`;
-  const topMetricChip = isLaundryVariant ? `${Math.min(laundryRoundIndex + 1, 10)} / 10` : 'Passenger Call';
-  const coreStatusSuffix = isLaundryVariant
+  const topMetricLabel = isSampleMissionVariant
+    ? isAlbumVariant
+      ? 'Photo Batch'
+      : 'Target Item'
+    : 'Target Floor';
+  const topMetricValue = isSampleMissionVariant ? (isAlbumVariant ? '10 photos' : '10 items') : `${targetFloor}F`;
+  const topMetricChip = isSampleMissionVariant ? `${Math.min(laundryRoundIndex + 1, 10)} / 10` : 'Passenger Call';
+  const coreStatusSuffix = isSampleMissionVariant
     ? (activePrediction
         ? classLabels[activePrediction.predictedLabel] ?? `Class ${activePrediction.predictedLabel}`
-        : 'Sorter Idle')
+        : isAlbumVariant
+          ? 'Album Idle'
+          : 'Sorter Idle')
     : invalidPredictionFloor !== null
       ? `Read ${invalidPredictionFloor}F · Hold`
       : `Current ${clampedCurrentFloor}F`;
   const latestLaundryMismatch = useMemo(() => {
-    if (!isLaundryVariant) {
+    if (!isSampleMissionVariant) {
       return null;
     }
 
@@ -686,11 +806,13 @@ export function MnistElevatorMission({
         const targetLabel = classLabels[result.targetIndex] ?? sampleClasses[result.targetIndex]?.label ?? 'Unknown';
         const predictedLabel =
           classLabels[result.predictedIndex] ?? sampleClasses[result.predictedIndex]?.label ?? 'Unknown';
-        return `${targetLabel}을(를) ${predictedLabel}(으)로 헷갈려요!`;
+        return isAlbumVariant
+          ? `${targetLabel} 사진을 ${predictedLabel} 앨범으로 보냈어요!`
+          : `${targetLabel}을(를) ${predictedLabel}(으)로 헷갈려요!`;
       }
     }
     return null;
-  }, [classLabels, isLaundryVariant, laundryResults, sampleClasses]);
+  }, [classLabels, isAlbumVariant, isSampleMissionVariant, laundryResults, sampleClasses]);
 
   useEffect(() => {
     const syncElevatorCarPosition = () => {
@@ -814,7 +936,7 @@ export function MnistElevatorMission({
       return;
     }
 
-    if (isLaundryVariant) {
+    if (isSampleMissionVariant) {
       if (!dataset || !currentLaundryInput?.imageSrc) {
         return;
       }
@@ -851,7 +973,7 @@ export function MnistElevatorMission({
 
           if (nextRoundIndex >= 10) {
             setLaundryAttemptFinished(true);
-            if (nextCorrectCount >= LAUNDRY_PASS_COUNT) {
+            if (nextCorrectCount >= sampleMissionPassCount) {
               onMissionComplete();
             }
           } else {
@@ -863,11 +985,16 @@ export function MnistElevatorMission({
           const predictedLabel = classLabels[result.predictedLabel] ?? `Class ${result.predictedLabel}`;
           const targetLabel = targetSample?.label ?? 'Target item';
           setSamplePredictError(
-            `${targetLabel}을(를) ${predictedLabel}(으)로 헷갈렸어요. 아직 비슷한 종류를 안정적으로 구분하지 못하고 있습니다.`,
+            isAlbumVariant
+              ? `${targetLabel} 사진을 ${predictedLabel} 앨범으로 보냈어요. 새 구도와 배경이 섞이면 아직 일반화가 흔들립니다.`
+              : `${targetLabel}을(를) ${predictedLabel}(으)로 헷갈렸어요. 아직 비슷한 종류를 안정적으로 구분하지 못하고 있습니다.`,
           );
           const nextRoundIndex = laundryRoundIndex + 1;
           if (nextRoundIndex >= 10) {
             setLaundryAttemptFinished(true);
+            if (laundryCorrectCount >= sampleMissionPassCount) {
+              onMissionComplete();
+            }
           } else {
             setLaundryRoundIndex(nextRoundIndex);
             setTargetSampleIndex(laundryTargets[nextRoundIndex] ?? randomIndex(sampleClasses.length));
@@ -933,8 +1060,10 @@ export function MnistElevatorMission({
         <div
           className={[
             'absolute inset-0',
-            isLaundryVariant
-              ? 'bg-[radial-gradient(circle_at_16%_18%,rgba(34,197,94,0.14),transparent_20%),radial-gradient(circle_at_82%_16%,rgba(56,189,248,0.16),transparent_22%),linear-gradient(180deg,rgba(8,18,28,0.96),rgba(8,12,20,0.98))]'
+            isSampleMissionVariant
+              ? isAlbumVariant
+                ? 'bg-[radial-gradient(circle_at_16%_18%,rgba(14,165,233,0.18),transparent_20%),radial-gradient(circle_at_82%_16%,rgba(45,212,191,0.16),transparent_22%),linear-gradient(180deg,rgba(6,17,35,0.96),rgba(7,12,24,0.98))]'
+                : 'bg-[radial-gradient(circle_at_16%_18%,rgba(34,197,94,0.14),transparent_20%),radial-gradient(circle_at_82%_16%,rgba(56,189,248,0.16),transparent_22%),linear-gradient(180deg,rgba(8,18,28,0.96),rgba(8,12,20,0.98))]'
               : 'bg-[radial-gradient(circle_at_18%_18%,rgba(249,115,22,0.22),transparent_22%),radial-gradient(circle_at_78%_18%,rgba(59,130,246,0.18),transparent_22%),linear-gradient(180deg,rgba(10,16,28,0.96),rgba(8,13,24,0.98))]',
           ].join(' ')}
         />
@@ -945,20 +1074,24 @@ export function MnistElevatorMission({
                 <div
                   className={[
                     'absolute inset-0',
-                    isLaundryVariant
-                      ? 'bg-[radial-gradient(circle_at_28%_22%,rgba(125,211,252,0.12),transparent_24%),linear-gradient(180deg,#162234_0%,#0c1422_100%)]'
+                    isSampleMissionVariant
+                      ? isAlbumVariant
+                        ? 'bg-[radial-gradient(circle_at_28%_22%,rgba(56,189,248,0.16),transparent_24%),linear-gradient(180deg,#10213b_0%,#07111f_100%)]'
+                        : 'bg-[radial-gradient(circle_at_28%_22%,rgba(125,211,252,0.12),transparent_24%),linear-gradient(180deg,#162234_0%,#0c1422_100%)]'
                       : 'bg-[radial-gradient(circle_at_50%_28%,rgba(251,191,36,0.18),transparent_28%),linear-gradient(180deg,#1f2937_0%,#111827_100%)]',
                   ].join(' ')}
                 />
                 <div
                   className={[
                     'absolute top-0 h-full',
-                    isLaundryVariant
-                      ? 'inset-x-[7%] bg-[linear-gradient(180deg,#1d2c3d,#131d2b)]'
+                    isSampleMissionVariant
+                      ? isAlbumVariant
+                        ? 'inset-x-[4%] bg-[linear-gradient(180deg,#142542,#081421)]'
+                        : 'inset-x-[7%] bg-[linear-gradient(180deg,#1d2c3d,#131d2b)]'
                       : 'inset-x-[18%] bg-[linear-gradient(180deg,#2a3348,#151b2c)]',
                   ].join(' ')}
                 >
-                  {isLaundryVariant ? (
+                  {isSampleMissionVariant ? (
                     <>
                       <img
                         src={laundryBackgroundImage}
@@ -1005,16 +1138,16 @@ export function MnistElevatorMission({
                         ? () => setSceneIndex((current) => Math.max(0, current - 1))
                         : undefined
                     }
-                    actionLabel={sceneIndex === (isLaundryVariant ? laundryIntroScenes.length : introScenes.length) - 1 ? 'Accept Quest' : 'Next'}
+                    actionLabel={sceneIndex === activeIntroScenes.length - 1 ? 'Accept Quest' : 'Next'}
                     onAction={() => {
-                      if (sceneIndex === (isLaundryVariant ? laundryIntroScenes.length : introScenes.length) - 1) {
+                      if (sceneIndex === activeIntroScenes.length - 1) {
                         onStartQuest?.();
                         return;
                       }
                       setSceneIndex((current) =>
                         Math.min(
                           current + 1,
-                          (isLaundryVariant ? laundryIntroScenes.length : introScenes.length) - 1,
+                          activeIntroScenes.length - 1,
                         ),
                       );
                     }}
@@ -1061,12 +1194,14 @@ export function MnistElevatorMission({
               <div
                 className={[
                   'absolute inset-0',
-                  isLaundryVariant
-                    ? 'bg-[radial-gradient(circle_at_22%_18%,rgba(34,197,94,0.12),transparent_24%),radial-gradient(circle_at_78%_16%,rgba(125,211,252,0.14),transparent_20%),linear-gradient(180deg,rgba(17,24,39,0.12),rgba(2,6,23,0.06))]'
+                  isSampleMissionVariant
+                    ? isAlbumVariant
+                      ? 'bg-[radial-gradient(circle_at_22%_18%,rgba(56,189,248,0.16),transparent_24%),radial-gradient(circle_at_78%_16%,rgba(45,212,191,0.14),transparent_20%),linear-gradient(180deg,rgba(15,23,42,0.1),rgba(2,6,23,0.08))]'
+                      : 'bg-[radial-gradient(circle_at_22%_18%,rgba(34,197,94,0.12),transparent_24%),radial-gradient(circle_at_78%_16%,rgba(125,211,252,0.14),transparent_20%),linear-gradient(180deg,rgba(17,24,39,0.12),rgba(2,6,23,0.06))]'
                     : 'bg-[radial-gradient(circle_at_18%_20%,rgba(59,130,246,0.12),transparent_22%),radial-gradient(circle_at_84%_18%,rgba(249,115,22,0.12),transparent_18%)]',
                 ].join(' ')}
               />
-              {isLaundryVariant ? (
+              {isSampleMissionVariant ? (
                 <>
                   <img
                     src={laundryBackgroundImage}
@@ -1083,8 +1218,15 @@ export function MnistElevatorMission({
                   isCompactResultLayout ? 'min-h-[448px] py-3' : 'min-h-[500px] py-4',
                 ].join(' ')}
               >
-                {isLaundryVariant ? (
-                  <div className="absolute inset-x-[10%] top-0 h-full bg-[linear-gradient(180deg,#223243,#141d2c)]">
+                {isSampleMissionVariant ? (
+                  <div
+                    className={[
+                      'absolute top-0 h-full',
+                      isAlbumVariant
+                        ? 'inset-x-[4%] bg-[linear-gradient(180deg,#10213b,#081421)]'
+                        : 'inset-x-[10%] bg-[linear-gradient(180deg,#223243,#141d2c)]',
+                    ].join(' ')}
+                  >
                     <img
                       src={laundryBackgroundImage}
                       alt=""
@@ -1197,7 +1339,7 @@ export function MnistElevatorMission({
                 <div className={['grid lg:grid-cols-3', isCompactResultLayout ? 'gap-2' : 'gap-4'].join(' ')}>
                   <div className={['rounded-[22px] border border-[#dbe5f1] bg-white px-4 shadow-[0_14px_30px_rgba(15,23,42,0.05)]', isCompactResultLayout ? 'py-2' : 'py-4'].join(' ')}>
                     <div className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#7c8ca5]">
-                      {isLaundryVariant ? 'Evaluation Set' : topMetricLabel}
+                      {isSampleMissionVariant ? sampleMissionBoardLabel : topMetricLabel}
                     </div>
                     <div className={['flex items-end justify-between gap-3', isCompactResultLayout ? 'mt-2' : 'mt-3'].join(' ')}>
                       <div className={['font-display font-bold tracking-[-0.04em] text-[#10213b]', isCompactResultLayout ? 'text-[28px]' : 'text-[34px]'].join(' ')}>
@@ -1233,8 +1375,8 @@ export function MnistElevatorMission({
                       </div>
                       {activePrediction ? (
                         <div className="rounded-full bg-[#eef3ff] px-3 py-1.5 text-[11px] font-bold text-primary">
-                          {isLaundryVariant
-                            ? `Sorted ${classLabels[activePrediction.predictedLabel] ?? `Class ${activePrediction.predictedLabel}`}`
+                          {isSampleMissionVariant
+                            ? `${isAlbumVariant ? 'Album' : 'Sorted'} ${classLabels[activePrediction.predictedLabel] ?? `Class ${activePrediction.predictedLabel}`}`
                             : `Read ${(resolvedActiveMissionFloor ?? activePrediction.predictedLabel)}F`}
                         </div>
                       ) : null}
@@ -1248,18 +1390,20 @@ export function MnistElevatorMission({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#7c8ca5]">
-                            {isLaundryVariant ? 'Sorter Status' : 'Elevator Status'}
+                            {isSampleMissionVariant ? sampleMissionStatusLabel : 'Elevator Status'}
                           </div>
                           <div className={['font-semibold text-[#5f7088]', isCompactResultLayout ? 'mt-1 text-[13px]' : 'mt-2 text-[15px]'].join(' ')}>
-                            {isLaundryVariant
-                              ? '분류 결과에 따라 세탁물이 해당 바구니 라인으로 이동합니다.'
+                            {isSampleMissionVariant
+                              ? isAlbumVariant
+                                ? '분류 결과에 따라 사진이 해당 앨범 폴더로 자동 이동합니다.'
+                                : '분류 결과에 따라 세탁물이 해당 바구니 라인으로 이동합니다.'
                               : '인식 결과에 따라 실제 엘리베이터가 층을 이동합니다.'}
                           </div>
                         </div>
                         <div className="rounded-full bg-[#dbeafe] px-3.5 py-1.5 text-[12px] font-black tracking-[0.08em] text-[#1d4ed8] shadow-[0_8px_18px_rgba(37,99,235,0.12)]">
-                          {isLaundryVariant
+                          {isSampleMissionVariant
                             ? activePrediction
-                              ? classLabels[activePrediction.predictedLabel] ?? 'Sorted'
+                              ? classLabels[activePrediction.predictedLabel] ?? (isAlbumVariant ? 'Classified' : 'Sorted')
                               : targetSample?.label ?? 'Standby'
                             : invalidPredictionFloor !== null
                               ? `Read ${invalidPredictionFloor}F · Hold`
@@ -1268,11 +1412,11 @@ export function MnistElevatorMission({
                       </div>
 
                       <div className={['flex justify-center', isCompactResultLayout ? 'mt-3' : 'mt-5'].join(' ')}>
-                        {isLaundryVariant ? (
+                        {isSampleMissionVariant ? (
                           <div className="grid w-full gap-3">
                             <div className="rounded-[24px] border border-[#d9e2ef] bg-[linear-gradient(180deg,#eef4ff,#ffffff)] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.9)]">
                               <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#7c8ca5]">
-                                Evaluation Board
+                                {sampleMissionBoardLabel}
                               </div>
                               <div className="mt-3 grid grid-cols-5 gap-2.5">
                                 {laundryResults.map((result, index) => {
@@ -1379,12 +1523,12 @@ export function MnistElevatorMission({
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <div className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#7c8ca5]">
-                            {isLaundryVariant ? 'Laundry Item Input' : 'Handwriting Input'}
+                            {isSampleMissionVariant ? sampleMissionInputLabel : 'Handwriting Input'}
                           </div>
                           <div className={['font-semibold text-[#5f7088]', isCompactResultLayout ? 'mt-1 text-[13px]' : 'mt-2 text-[15px]'].join(' ')}>
                             {isMissionReady
-                              ? isLaundryVariant
-                                ? `Evaluation Board의 ${laundryRoundIndex + 1}번째 세탁물이 입력으로 들어왔습니다. 빨래 분류하기 버튼으로 결과를 확인하세요.`
+                              ? isSampleMissionVariant
+                                ? `${sampleMissionBoardLabel}의 ${laundryRoundIndex + 1}번째 ${sampleMissionNoun}이 입력으로 들어왔습니다. ${sampleMissionActionLabel} 버튼으로 결과를 확인하세요.`
                                 : `${targetFloor}층을 손글씨로 적어 엘리베이터를 호출하세요.`
                               : '먼저 모델을 학습해야 미션 콘솔이 활성화됩니다.'}
                           </div>
@@ -1392,14 +1536,14 @@ export function MnistElevatorMission({
                         {!isCompactResultLayout ? (
                           <div className="rounded-[18px] bg-[#0f172a] px-4 py-3 text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)]">
                             <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-white/54">
-                              {isLaundryVariant ? 'Laundry Request' : 'Passenger Request'}
+                              {isSampleMissionVariant ? sampleMissionRequestLabel : 'Passenger Request'}
                             </div>
                             <div className="mt-2 flex items-end gap-2">
                               <div className="font-display text-[42px] font-bold leading-none">
-                                {isLaundryVariant ? targetSample?.label ?? 'Laundry' : targetFloor}
+                                {isSampleMissionVariant ? targetSample?.label ?? sampleMissionNoun : targetFloor}
                               </div>
                               <div className="pb-1 text-[13px] font-semibold text-white/74">
-                                {isLaundryVariant ? 'item' : '층'}
+                                {isSampleMissionVariant ? (isAlbumVariant ? 'album' : 'item') : '층'}
                               </div>
                             </div>
                           </div>
@@ -1409,13 +1553,13 @@ export function MnistElevatorMission({
                       <div
                         className={[
                           'grid gap-3 lg:items-stretch',
-                          isLaundryVariant
+                          isSampleMissionVariant
                             ? 'lg:grid-cols-[220px_minmax(260px,1fr)]'
                             : 'lg:grid-cols-[minmax(0,220px)_190px]',
                           isCompactResultLayout ? 'mt-2.5' : 'mt-5',
                         ].join(' ')}
                       >
-                        {isLaundryVariant ? (
+                        {isSampleMissionVariant ? (
                           <div className="grid gap-2.5">
                             <div className="flex aspect-square w-full max-w-[220px] items-center justify-center rounded-[22px] border border-[#cbd5e1] bg-[linear-gradient(180deg,#f8fbff,#ffffff)] p-4 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.7)]">
                               {currentLaundryInput?.imageSrc ? (
@@ -1429,7 +1573,7 @@ export function MnistElevatorMission({
                               )}
                             </div>
                             <div className="rounded-[16px] border border-[#dbe5f1] bg-[#f8fbff] px-3 py-2 text-[12px] font-semibold text-[#5f7088]">
-                              Evaluation Board의 세탁물이 순서대로 입력됩니다.
+                              {sampleMissionBoardLabel}의 {sampleMissionNoun}이 순서대로 입력됩니다.
                             </div>
                           </div>
                         ) : (
@@ -1451,19 +1595,19 @@ export function MnistElevatorMission({
                         <div className={['flex h-full flex-col justify-center', isCompactResultLayout ? 'gap-2' : 'gap-3'].join(' ')}>
                           <div className={['rounded-[18px] bg-[#0f172a] px-4 text-white shadow-[0_14px_30px_rgba(15,23,42,0.18)]', isCompactResultLayout ? 'py-2.5' : 'py-3'].join(' ')}>
                             <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-white/54">
-                              {isLaundryVariant ? 'Current Laundry Input' : 'Passenger Request'}
+                              {isSampleMissionVariant ? sampleMissionCurrentInputLabel : 'Passenger Request'}
                             </div>
                             <div className="mt-2 flex items-end gap-2">
                               <div className={['font-display font-bold leading-none', isCompactResultLayout ? 'text-[32px]' : 'text-[42px]'].join(' ')}>
-                                {isLaundryVariant ? `Item ${laundryRoundIndex + 1}` : targetFloor}
+                                {isSampleMissionVariant ? `${isAlbumVariant ? 'Photo' : 'Item'} ${laundryRoundIndex + 1}` : targetFloor}
                               </div>
                               <div className="pb-1 text-[13px] font-semibold text-white/74">
-                                {isLaundryVariant ? 'of 10' : '층'}
+                                {isSampleMissionVariant ? 'of 10' : '층'}
                               </div>
                             </div>
                           </div>
                           <div className={['grid', isCompactResultLayout ? 'gap-1.5' : 'gap-2'].join(' ')}>
-                            {!isLaundryVariant ? (
+                            {!isSampleMissionVariant ? (
                               <button
                                 type="button"
                                 onClick={clearDrawing}
@@ -1477,20 +1621,20 @@ export function MnistElevatorMission({
                               onClick={() => {
                                 void runPrediction();
                               }}
-                              disabled={!isMissionReady || isPredicting || (isLaundryVariant && laundryAttemptFinished)}
+                              disabled={!isMissionReady || isPredicting || (isSampleMissionVariant && laundryAttemptFinished)}
                               className={['rounded-full bg-[linear-gradient(135deg,#1151ff,#3d73ff)] px-4 font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_12px_28px_rgba(17,81,255,0.2)] disabled:cursor-not-allowed disabled:opacity-60', isCompactResultLayout ? 'py-2 text-[12px]' : 'py-3 text-[13px]'].join(' ')}
                             >
                               {isPredicting
-                                ? isLaundryVariant
-                                  ? '분류 중...'
+                                ? isSampleMissionVariant
+                                  ? sampleMissionPredictingLabel
                                   : 'Reading...'
-                                : isLaundryVariant
-                                  ? '빨래 분류하기'
+                                : isSampleMissionVariant
+                                  ? sampleMissionActionLabel
                                   : 'Predict Floor'}
                             </button>
                           </div>
 
-                          {isLaundryVariant && activePrediction ? (
+                          {isSampleMissionVariant && activePrediction ? (
                             <div className="rounded-[20px] border border-[#dce6f6] bg-[linear-gradient(135deg,#ffffff,#eef4ff)] px-4 py-3 shadow-[0_12px_28px_rgba(17,81,255,0.08)]">
                               <div className="flex items-start justify-between gap-4">
                                 <div>
@@ -1531,7 +1675,7 @@ export function MnistElevatorMission({
                         </div>
                       ) : null}
 
-                      {activePrediction && !isLaundryVariant ? (
+                      {activePrediction && !isSampleMissionVariant ? (
                         <div className={['rounded-[22px] border border-[#dce6f6] bg-[linear-gradient(135deg,#ffffff,#eef4ff)] px-4 shadow-[0_12px_28px_rgba(17,81,255,0.08)]', isCompactResultLayout ? 'mt-2 py-2.5' : 'mt-4 py-5'].join(' ')}>
                           <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
@@ -1540,23 +1684,17 @@ export function MnistElevatorMission({
                               </div>
                               <div className="mt-2 flex items-end gap-3">
                                 <div className={['font-display font-bold text-primary', isCompactResultLayout ? 'text-[30px]' : 'text-[36px]'].join(' ')}>
-                                  {isLaundryVariant
-                                    ? classLabels[activePrediction.predictedLabel] ?? `Class ${activePrediction.predictedLabel}`
-                                    : `${(resolvedActiveMissionFloor ?? activePrediction.predictedLabel)}F`}
+                                  {`${(resolvedActiveMissionFloor ?? activePrediction.predictedLabel)}F`}
                                 </div>
                                 <div
                                   className={[
                                     'rounded-full px-3 py-1.5 text-[11px] font-bold',
-                                    (isLaundryVariant
-                                      ? activePrediction.predictedLabel === currentLaundryTargetIndex
-                                      : resolvedActiveMissionFloor === targetFloor)
+                                    resolvedActiveMissionFloor === targetFloor
                                       ? 'bg-[#dcfce7] text-[#166534]'
                                       : 'bg-[#fee2e2] text-[#b42318]',
                                   ].join(' ')}
                                 >
-                                  {(isLaundryVariant
-                                    ? activePrediction.predictedLabel === currentLaundryTargetIndex
-                                    : resolvedActiveMissionFloor === targetFloor)
+                                  {resolvedActiveMissionFloor === targetFloor
                                     ? 'Correct'
                                     : 'Retry'}
                                 </div>
@@ -1574,11 +1712,11 @@ export function MnistElevatorMission({
                         </div>
                       ) : null}
 
-                      {isLaundryVariant && laundryAttemptFinished && !isMissionComplete ? (
+                      {isSampleMissionVariant && laundryAttemptFinished && !isMissionComplete ? (
                         <div
                           className={[
                             'rounded-[20px] border px-4 shadow-[0_12px_28px_rgba(15,23,42,0.08)]',
-                            laundryCorrectCount >= LAUNDRY_PASS_COUNT
+                            laundryCorrectCount >= sampleMissionPassCount
                               ? 'border-[#bbf7d0] bg-[linear-gradient(135deg,#f0fdf4,#dcfce7)] text-[#166534]'
                               : 'border-[#fecdd3] bg-[linear-gradient(135deg,#fff1f2,#ffe4e6)] text-[#b42318]',
                             isCompactResultLayout ? 'mt-2 py-2.5' : 'mt-4 py-4',
@@ -1587,15 +1725,15 @@ export function MnistElevatorMission({
                           <div className="flex items-start justify-between gap-4">
                             <div>
                               <div className="text-[11px] font-extrabold uppercase tracking-[0.16em]">
-                                {laundryCorrectCount >= LAUNDRY_PASS_COUNT ? 'Sorter Ready' : 'Still Not Enough'}
+                                {laundryCorrectCount >= sampleMissionPassCount ? sampleMissionReadyLabel : sampleMissionNotEnoughLabel}
                               </div>
                               <div className={['font-semibold', isCompactResultLayout ? 'mt-1 text-[12px]' : 'mt-2 text-[14px]'].join(' ')}>
-                                {laundryCorrectCount >= LAUNDRY_PASS_COUNT
-                                  ? `총 10개 중 ${laundryCorrectCount}개를 맞혀 통과 기준 ${LAUNDRY_PASS_COUNT}개를 넘겼습니다. 이제 분류 라인을 다시 돌릴 수 있어요.`
-                                  : `총 10개 중 ${laundryCorrectCount}개만 맞혔습니다. 통과하려면 적어도 ${LAUNDRY_PASS_COUNT}개를 맞혀야 합니다.`}
+                                {laundryCorrectCount >= sampleMissionPassCount
+                                  ? `총 10개 중 ${laundryCorrectCount}개를 맞혀 통과 기준 ${sampleMissionPassCount}개를 넘겼습니다. 이제 ${sampleMissionSystemName}를 다시 돌릴 수 있어요.`
+                                  : `총 10개 중 ${laundryCorrectCount}개만 맞혔습니다. 통과하려면 적어도 ${sampleMissionPassCount}개를 맞혀야 합니다.`}
                               </div>
                             </div>
-                            {!isMissionComplete && laundryCorrectCount < LAUNDRY_PASS_COUNT ? (
+                            {!isMissionComplete && laundryCorrectCount < sampleMissionPassCount ? (
                               <button
                                 type="button"
                                 onClick={() => onMissionFail?.({ correctCount: laundryCorrectCount, totalCount: 10 })}
@@ -1619,8 +1757,10 @@ export function MnistElevatorMission({
                                 Quest Complete
                               </div>
                               <div className={['font-semibold', isCompactResultLayout ? 'mt-0.5 text-[12px]' : 'mt-1 text-[14px]'].join(' ')}>
-                                {isLaundryVariant
-                                  ? '세탁물 이미지를 올바르게 분류해서 자동 세탁 분류 라인을 복구했습니다.'
+                                {isSampleMissionVariant
+                                  ? isAlbumVariant
+                                    ? '사진을 올바른 앨범으로 분류해서 자동 앨범 정리기를 복구했습니다.'
+                                    : '세탁물 이미지를 올바르게 분류해서 자동 세탁 분류 라인을 복구했습니다.'
                                   : '손글씨 숫자를 올바른 층수로 해석해서 버튼 없는 엘리베이터를 복구했습니다.'}
                               </div>
                             </div>

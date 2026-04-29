@@ -305,6 +305,14 @@ type LessonCoachStep =
   | 'cnn11-place-second-cnn'
   | 'cnn11-set-second-cnn-in'
   | 'cnn11-set-second-cnn-out'
+  | 'cnn11-add-third-cnn'
+  | 'cnn11-place-third-cnn'
+  | 'cnn11-set-third-cnn-in'
+  | 'cnn11-set-third-cnn-out'
+  | 'cnn11-add-fourth-cnn'
+  | 'cnn11-place-fourth-cnn'
+  | 'cnn11-set-fourth-cnn-in'
+  | 'cnn11-set-fourth-cnn-out'
   | 'cnn11-add-second-pool'
   | 'cnn11-place-second-pool'
   | 'cnn11-add-head-linear'
@@ -319,7 +327,21 @@ type LessonCoachStep =
   | 'cnn11-linear-limit'
   | 'cnn11-upgrade-cnn'
   | 'cnn11-retrain-cnn'
-  | 'cnn11-success';
+  | 'cnn11-success'
+  | 'cnn12-intro'
+  | 'cnn12-add-third-cnn'
+  | 'cnn12-place-third-cnn'
+  | 'cnn12-set-third-cnn-in'
+  | 'cnn12-set-third-cnn-out'
+  | 'cnn12-match-head-input'
+  | 'cnn12-retrain'
+  | 'cnn12-success'
+  | 'cnn13-intro'
+  | 'cnn13-select-mixup'
+  | 'cnn13-tune-mixup'
+  | 'cnn13-select-cutmix'
+  | 'cnn13-retrain'
+  | 'cnn13-success';
 
 function cloneNodes(nodes: CanvasNode[]): CanvasNode[] {
   return nodes.map((node) => ({
@@ -408,8 +430,22 @@ function getTutorialLessonPresetNodes(tutorialLessonId: string | null): CanvasNo
       ];
     case 'cnn-1-1':
       return [];
+    case 'cnn-1-2':
+    case 'cnn-1-3':
+      return [];
     default:
       return [];
+  }
+}
+
+function getInitialLessonCoachStep(lessonId: string | null): LessonCoachStep | null {
+  switch (lessonId) {
+    case 'mlp-1-2':
+      return 'mlp12-intro';
+    case 'cnn-1-3':
+      return null;
+    default:
+      return null;
   }
 }
 
@@ -509,6 +545,7 @@ export function BuilderShell() {
   const lastStoryQuestOpenedJobIdRef = useRef<string | null>(null);
   const lastDismissedLessonCoachStepRef = useRef<LessonCoachStep>('mlp12-intro');
   const lastDismissedTutorialStepRef = useRef<TutorialStepKey>('build-model');
+  const blockDropCompletedRef = useRef(false);
   const pollingRef = useRef<number | null>(null);
   const streamRef = useRef<EventSource | null>(null);
   const liveBatchKeyRef = useRef<string | null>(null);
@@ -568,11 +605,22 @@ export function BuilderShell() {
     activeWorkspace === 'tutorial' &&
     selectedTutorialLessonId === 'cnn-1-1' &&
     runtimeDatasetId === 'fashion_mnist';
-  const isStoryTutorialActive = isMnistTutorialActive || isCnn11TutorialActive;
   const isMlp12TutorialActive =
     activeWorkspace === 'tutorial' &&
     selectedTutorialLessonId === 'mlp-1-2' &&
     runtimeDatasetId === 'mnist';
+  const isCnn12TutorialActive =
+    activeWorkspace === 'tutorial' &&
+    selectedTutorialLessonId === 'cnn-1-2' &&
+    runtimeDatasetId === 'fashion_mnist';
+  const isCnn13TutorialActive =
+    activeWorkspace === 'tutorial' &&
+    selectedTutorialLessonId === 'cnn-1-3' &&
+    runtimeDatasetId === 'cifar10';
+  const isStoryTutorialActive =
+    isMnistTutorialActive || isCnn11TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive;
+  const isGuidedLessonActive =
+    isMlp12TutorialActive || isCnn11TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive;
   const linearNodes = nodes.filter((node) => node.type === 'linear');
   const poolingNodeCount = nodes.filter((node) => node.type === 'pooling').length;
   const cnnNodeCount = nodes.filter((node) => node.type === 'cnn').length;
@@ -580,6 +628,9 @@ export function BuilderShell() {
   const cnnNodes = nodes.filter((node) => node.type === 'cnn');
   const firstCnnNode = cnnNodes[0] ?? null;
   const secondCnnNode = cnnNodes[1] ?? null;
+  const thirdCnnNode = cnnNodes[2] ?? null;
+  const fourthCnnNode = cnnNodes[3] ?? null;
+  const fifthCnnNode = cnnNodes[4] ?? null;
   const previousLinearNode = linearNodes[linearNodes.length - 2] ?? null;
   const outputLinearNode = linearNodes[linearNodes.length - 1] ?? null;
   const previousLinearOutputValue =
@@ -597,6 +648,18 @@ export function BuilderShell() {
     secondCnnNode?.fields.find((field) => field.label === 'Channel In')?.value ?? '';
   const secondCnnOutValue =
     secondCnnNode?.fields.find((field) => field.label === 'Channel Out')?.value ?? '';
+  const thirdCnnInValue =
+    thirdCnnNode?.fields.find((field) => field.label === 'Channel In')?.value ?? '';
+  const thirdCnnOutValue =
+    thirdCnnNode?.fields.find((field) => field.label === 'Channel Out')?.value ?? '';
+  const fourthCnnInValue =
+    fourthCnnNode?.fields.find((field) => field.label === 'Channel In')?.value ?? '';
+  const fourthCnnOutValue =
+    fourthCnnNode?.fields.find((field) => field.label === 'Channel Out')?.value ?? '';
+  const fifthCnnInValue =
+    fifthCnnNode?.fields.find((field) => field.label === 'Channel In')?.value ?? '';
+  const fifthCnnOutValue =
+    fifthCnnNode?.fields.find((field) => field.label === 'Channel Out')?.value ?? '';
   const cnnHeadInputValue =
     linearNodes[0]?.fields.find((field) => field.label === 'Input')?.value ?? '';
   const cnnHeadOutputValue =
@@ -605,21 +668,65 @@ export function BuilderShell() {
     linearNodes[1]?.fields.find((field) => field.label === 'Input')?.value ?? '';
   const cnnOutputValue =
     linearNodes[1]?.fields.find((field) => field.label === 'Output')?.value ?? '';
+  const baseCnnInputChannelsTarget = isCnn13TutorialActive ? '3' : '1';
+  const baseCnnHeadInputTarget = isCnn13TutorialActive ? '4096' : '3136';
+  const isBaseCnnArchitectureReady =
+    cnnNodeCount >= 4 &&
+    poolingNodeCount >= 2 &&
+    linearNodeCount >= 2 &&
+    firstCnnInValue === baseCnnInputChannelsTarget &&
+    firstCnnOutValue === '32' &&
+    secondCnnInValue === '32' &&
+    secondCnnOutValue === '32' &&
+    thirdCnnInValue === '32' &&
+    thirdCnnOutValue === '64' &&
+    fourthCnnInValue === '64' &&
+    fourthCnnOutValue === '64' &&
+    cnnHeadInputValue === baseCnnHeadInputTarget &&
+    cnnHeadOutputValue === '128' &&
+    cnnOutputInputValue === '128' &&
+    cnnOutputValue === '10' &&
+    (linearNodes[1]?.activation ?? '') === 'None';
   const isCnn11ArchitectureReady =
-    cnnNodeCount >= 2 &&
+    isCnn11TutorialActive && isBaseCnnArchitectureReady;
+  const isCnn12ArchitectureReady =
+    cnnNodeCount >= 5 &&
     poolingNodeCount >= 2 &&
     linearNodeCount >= 2 &&
     firstCnnInValue === '1' &&
     firstCnnOutValue === '32' &&
     secondCnnInValue === '32' &&
-    secondCnnOutValue === '64' &&
-    cnnHeadInputValue === '3136' &&
+    secondCnnOutValue === '32' &&
+    thirdCnnInValue === '32' &&
+    thirdCnnOutValue === '64' &&
+    fourthCnnInValue === '64' &&
+    fourthCnnOutValue === '64' &&
+    fifthCnnInValue === '64' &&
+    fifthCnnOutValue === '128' &&
+    cnnHeadInputValue === '6272' &&
     cnnHeadOutputValue === '128' &&
     cnnOutputInputValue === '128' &&
     cnnOutputValue === '10' &&
     (linearNodes[1]?.activation ?? '') === 'None';
+  const isCnn13ArchitectureReady = isCnn13TutorialActive && isBaseCnnArchitectureReady;
+  const hasCifarAugmentationPair =
+    selectedAugmentations.includes('mixup') && selectedAugmentations.includes('cutmix');
+  const storyMissionDatasetId = isCnn13TutorialActive
+    ? 'cifar10'
+    : isCnn11TutorialActive || isCnn12TutorialActive
+      ? 'fashion_mnist'
+      : 'mnist';
+  const isStoryMissionBuildReady =
+    isMnistTutorialActive ||
+    isCnn11TutorialActive ||
+    isCnn13TutorialActive ||
+    (isCnn12TutorialActive && isCnn12ArchitectureReady);
   const showTutorialMetricsSidebar =
-    (isMnistTutorialActive || isMlp12TutorialActive || isCnn11TutorialActive) &&
+    (isMnistTutorialActive ||
+      isMlp12TutorialActive ||
+      isCnn11TutorialActive ||
+      isCnn12TutorialActive ||
+      isCnn13TutorialActive) &&
     (isTraining ||
       trainingStatus !== null ||
       latestTrainingResult !== null ||
@@ -694,10 +801,11 @@ export function BuilderShell() {
     !!trainingStatus.jobId;
   const isStoryTutorialMissionReady =
     isStoryTutorialActive &&
+    isStoryMissionBuildReady &&
     !tutorialPredictionDone &&
     tutorialStep !== 'complete' &&
     trainingStatus?.status === 'completed' &&
-    trainingStatus.datasetId === (isCnn11TutorialActive ? 'fashion_mnist' : 'mnist') &&
+    trainingStatus.datasetId === storyMissionDatasetId &&
     !!trainingStatus.jobId;
   const mnistQuestPhase =
     tutorialStep === 'story-intro'
@@ -724,6 +832,8 @@ export function BuilderShell() {
     isStoryTutorialActive &&
     ((isMnistTutorialActive && isMnistGuideStep && !tutorialGuideOpen) ||
       (isCnn11TutorialActive && tutorialStep === 'build-model' && !lessonCoachStep) ||
+      (isCnn12TutorialActive && tutorialStep === 'build-model' && !lessonCoachStep && !tutorialPredictionDone) ||
+      (isCnn13TutorialActive && tutorialStep === 'build-model' && !lessonCoachStep && !tutorialPredictionDone) ||
       (isCnn11TutorialActive && shouldResumeCnn11Mission) ||
       (mnistQuestPhase && mnistQuestPhase !== 'intro' && isMnistMissionMinimized));
   const shellGridClassName = isCompetitionSetupVisible
@@ -735,10 +845,10 @@ export function BuilderShell() {
       : activeWorkspace === 'learning'
         ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(320px,360px)_minmax(0,1fr)] xl:gap-4'
       : activeWorkspace === 'competition' && competitionRoom !== null
-        ? 'mt-3 grid min-h-0 items-start gap-3 lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_clamp(240px,24vw,320px)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(260px,22vw,360px)]'
+        ? 'mt-3 grid min-h-0 items-start gap-3 lg:items-stretch lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_clamp(240px,24vw,320px)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(260px,22vw,360px)]'
       : activeWorkspace === 'tutorial'
-        ? 'mt-3 grid min-h-0 items-start gap-3 lg:justify-center lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(320px,21vw,448px)]'
-      : 'mt-3 grid min-h-0 items-start gap-3 lg:justify-center lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(320px,21vw,448px)]';
+        ? 'mt-3 grid min-h-0 items-start gap-3 lg:items-stretch lg:justify-center lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(320px,21vw,448px)]'
+      : 'mt-3 grid min-h-0 items-start gap-3 lg:items-stretch lg:justify-center lg:grid-cols-[minmax(272px,0.72fr)_minmax(0,1.74fr)_minmax(280px,0.82fr)] xl:gap-4 xl:grid-cols-[clamp(276px,15.5vw,320px)_minmax(0,1fr)_clamp(320px,21vw,448px)]';
   const handleWorkspaceSelect = (workspace: WorkspaceMode) => {
     if (workspace === activeWorkspace) {
       return;
@@ -798,7 +908,7 @@ export function BuilderShell() {
           title: '먼저 숫자 판별기를 만들자',
           description:
             '왼쪽 Block Library에서 Linear 블록을 잡아 끌어주세요. 먼저 드래그를 시작하면, 그다음 어디에 쌓을지 바로 보여줄게요.',
-          targetName: 'tutorial-block-library',
+          targetName: 'tutorial-linear-block',
           canAdvance: false,
         },
         'stack-block': {
@@ -927,7 +1037,7 @@ export function BuilderShell() {
           title: 'Val Acc가 아직 부족해요',
           description:
             '지금 모델은 표현력이 조금 부족합니다. Block Library에서 Linear Layer를 하나 더 추가해 hidden layer를 만들어보세요. Output 레이어 바로 앞에 끼워 넣는다고 생각하면 됩니다.',
-          targetName: 'tutorial-block-library',
+          targetName: 'tutorial-linear-block',
           canAdvance: true,
           advanceLabel: 'Layer 추가할게요',
         },
@@ -978,8 +1088,9 @@ export function BuilderShell() {
         },
         'cnn11-set-first-cnn-in': {
           title: '첫 번째 Conv의 입력 채널부터 맞추자',
-          description:
-            'Fashion-MNIST는 흑백 이미지라 입력 채널이 1입니다. 첫 번째 CNN Layer의 `Channel In`을 `1`로 맞춰주세요.',
+          description: isCnn13TutorialActive
+            ? 'CIFAR-10 사진은 RGB 컬러 이미지라 입력 채널이 3입니다. 첫 번째 CNN Layer의 `Channel In`을 `3`으로 맞춰주세요.'
+            : 'Fashion-MNIST는 흑백 이미지라 입력 채널이 1입니다. 첫 번째 CNN Layer의 `Channel In`을 `1`로 맞춰주세요.',
           targetName: 'tutorial-cnn-channel-in-field',
           canAdvance: false,
         },
@@ -993,28 +1104,28 @@ export function BuilderShell() {
         'cnn11-add-linear': {
           title: '이제 첫 Pooling을 추가하자',
           description:
-            '좋아요. 이제 Block Library에서 Pooling Layer를 선택해 첫 번째 Conv 뒤에 이어붙일 준비를 해봅시다.',
-          targetName: 'tutorial-block-library',
+            '좋아요. 첫 번째 묶음은 `Conv → Conv`로 충분히 특징을 만든 다음 줄입니다. 이제 Block Library에서 Pooling Layer를 선택해 두 번째 Conv 뒤에 이어붙일 준비를 해봅시다.',
+          targetName: 'tutorial-pooling-block',
           canAdvance: false,
         },
         'cnn11-place-first-pool': {
           title: '첫 번째 Pooling을 Canvas에 놓자',
           description:
-            'Pooling Layer를 Builder Canvas에 두어 첫 번째 Conv 뒤에 연결해주세요. 특징 맵 크기를 줄이는 단계입니다.',
+            'Pooling Layer를 Builder Canvas에 두어 두 번째 Conv 뒤에 연결해주세요. 첫 번째 특징 묶음을 읽은 뒤 feature map 크기를 줄이는 단계입니다.',
           targetName: 'tutorial-builder-canvas',
           canAdvance: false,
         },
         'cnn11-match-linear': {
           title: '이제 두 번째 Conv를 쌓자',
           description:
-            '다시 Block Library에서 CNN Layer를 선택해 두 번째 합성곱 블록을 추가할 차례입니다.',
-          targetName: 'tutorial-block-library',
+            'Pooling으로 줄이기 전에 같은 해상도에서 한 번 더 패턴을 읽어야 합니다. Block Library에서 CNN Layer를 다시 선택해 `Conv → Conv` 묶음을 만들어주세요.',
+          targetName: 'tutorial-cnn-block',
           canAdvance: false,
         },
         'cnn11-place-second-cnn': {
           title: '두 번째 Conv를 Canvas에 놓자',
           description:
-            '두 번째 CNN Layer를 Builder Canvas에 놓아 첫 번째 Pooling 뒤에 연결해주세요.',
+            '두 번째 CNN Layer를 첫 번째 Conv 바로 뒤에 놓아주세요. 아직 Pooling으로 줄이지 않고 같은 28x28 해상도에서 특징을 한 번 더 뽑습니다.',
           targetName: 'tutorial-builder-canvas',
           canAdvance: false,
         },
@@ -1026,17 +1137,73 @@ export function BuilderShell() {
           canAdvance: false,
         },
         'cnn11-set-second-cnn-out': {
-          title: '두 번째 Conv의 출력 채널을 늘리자',
+          title: '두 번째 Conv도 32채널로 유지',
           description:
-            '두 번째 CNN Layer의 `Channel Out`을 `64`로 맞춰 더 풍부한 특징을 읽게 만들어주세요.',
+            '첫 번째 묶음은 32채널에서 두 번 특징을 읽습니다. 두 번째 CNN Layer의 `Channel Out`을 `32`로 맞춰주세요.',
           targetName: 'tutorial-cnn2-channel-out-field',
+          canAdvance: false,
+        },
+        'cnn11-add-third-cnn': {
+          title: '이제 두 번째 Conv 묶음을 시작하자',
+          description:
+            '첫 번째 Pooling 뒤에는 더 추상적인 패턴을 읽습니다. Block Library에서 CNN Layer를 선택해 세 번째 Conv를 추가해주세요.',
+          targetName: 'tutorial-cnn-block',
+          canAdvance: false,
+        },
+        'cnn11-place-third-cnn': {
+          title: '세 번째 Conv를 Pooling 뒤에 놓자',
+          description:
+            '세 번째 CNN Layer를 첫 번째 Pooling 뒤에 놓아주세요. 이제 채널을 64로 올려 더 넓은 특징 조합을 만들겠습니다.',
+          targetName: 'tutorial-builder-canvas',
+          canAdvance: false,
+        },
+        'cnn11-set-third-cnn-in': {
+          title: '세 번째 Conv 입력 채널 맞추기',
+          description:
+            '앞 Conv 묶음은 32채널을 만들고 Pooling은 크기만 줄입니다. 세 번째 CNN Layer의 `Channel In`은 `32`여야 합니다.',
+          targetName: 'tutorial-cnn3-channel-in-field',
+          canAdvance: false,
+        },
+        'cnn11-set-third-cnn-out': {
+          title: '세 번째 Conv 출력은 64채널',
+          description:
+            '두 번째 묶음에서는 더 많은 특징 조합을 보도록 `Channel Out`을 `64`로 올려주세요.',
+          targetName: 'tutorial-cnn3-channel-out-field',
+          canAdvance: false,
+        },
+        'cnn11-add-fourth-cnn': {
+          title: '64채널에서 한 번 더 Conv',
+          description:
+            '두 번째 묶음도 `Conv → Conv`로 갑니다. Pooling 전에 CNN Layer를 하나 더 추가해서 64채널 특징을 한 번 더 정리해주세요.',
+          targetName: 'tutorial-cnn-block',
+          canAdvance: false,
+        },
+        'cnn11-place-fourth-cnn': {
+          title: '네 번째 Conv를 세 번째 Conv 뒤에 놓자',
+          description:
+            '네 번째 CNN Layer를 세 번째 Conv 바로 뒤에 놓아주세요. 이 다음에 두 번째 Pooling으로 feature map을 줄입니다.',
+          targetName: 'tutorial-builder-canvas',
+          canAdvance: false,
+        },
+        'cnn11-set-fourth-cnn-in': {
+          title: '네 번째 Conv 입력은 64채널',
+          description:
+            '세 번째 Conv가 64채널을 만들었으므로 네 번째 CNN Layer의 `Channel In`을 `64`로 맞춰주세요.',
+          targetName: 'tutorial-cnn4-channel-in-field',
+          canAdvance: false,
+        },
+        'cnn11-set-fourth-cnn-out': {
+          title: '네 번째 Conv도 64채널 유지',
+          description:
+            '두 번째 묶음은 64채널에서 두 번 패턴을 정리합니다. 네 번째 CNN Layer의 `Channel Out`을 `64`로 설정해주세요.',
+          targetName: 'tutorial-cnn4-channel-out-field',
           canAdvance: false,
         },
         'cnn11-add-second-pool': {
           title: '이제 두 번째 Pooling을 추가하자',
           description:
-            '좋아요. 두 번째 Conv까지 만들었으니 다시 Pooling Layer를 선택해 특징 맵을 한 번 더 줄여주세요.',
-          targetName: 'tutorial-block-library',
+            '좋아요. `Conv → Conv → Pool → Conv → Conv`까지 만들었습니다. 다시 Pooling Layer를 선택해 특징 맵을 한 번 더 줄여주세요.',
+          targetName: 'tutorial-pooling-block',
           canAdvance: false,
         },
         'cnn11-place-second-pool': {
@@ -1050,7 +1217,7 @@ export function BuilderShell() {
           title: '이제 첫 번째 Linear를 추가하자',
           description:
             '특징 맵을 두 번 줄였으니 이제 분류용 Linear Layer가 필요합니다. Block Library에서 Linear Layer를 선택해주세요.',
-          targetName: 'tutorial-block-library',
+          targetName: 'tutorial-linear-block',
           canAdvance: false,
         },
         'cnn11-place-head-linear': {
@@ -1062,8 +1229,9 @@ export function BuilderShell() {
         },
         'cnn11-set-head-linear-input': {
           title: '첫 번째 Linear 입력 크기를 맞추자',
-          description:
-            '두 번째 Pooling 뒤에는 `64 x 7 x 7 = 3136`개의 특징이 남습니다. 첫 번째 Linear의 `Input`을 `3136`으로 맞춰주세요.',
+          description: isCnn13TutorialActive
+            ? 'CIFAR-10은 32x32 RGB 이미지라 두 번 Pooling 뒤에 `64 x 8 x 8 = 4096`개의 특징이 남습니다. 첫 번째 Linear의 `Input`을 `4096`으로 맞춰주세요.'
+            : '두 번째 Pooling 뒤에는 `64 x 7 x 7 = 3136`개의 특징이 남습니다. 첫 번째 Linear의 `Input`을 `3136`으로 맞춰주세요.',
           targetName: 'tutorial-linear-input-field',
           canAdvance: false,
         },
@@ -1078,7 +1246,7 @@ export function BuilderShell() {
           title: '마지막 Output Linear를 추가하자',
           description:
             '이제 클래스 10개로 보내는 마지막 Linear Layer가 하나 더 필요합니다. 다시 Linear Layer를 선택해주세요.',
-          targetName: 'tutorial-block-library',
+          targetName: 'tutorial-linear-block',
           canAdvance: false,
         },
         'cnn11-place-output-linear': {
@@ -1098,7 +1266,7 @@ export function BuilderShell() {
         'cnn11-set-output-linear-output': {
           title: '마지막 Linear 출력은 10개 클래스다',
           description:
-            'Fashion-MNIST는 10개 클래스를 분류하므로 마지막 Linear의 `Output`을 `10`으로 맞춰주세요.',
+            '현재 실습 데이터셋은 10개 클래스를 분류하므로 마지막 Linear의 `Output`을 `10`으로 맞춰주세요.',
           targetName: 'tutorial-linear-output-field',
           canAdvance: false,
         },
@@ -1113,7 +1281,7 @@ export function BuilderShell() {
           title: '첫 번째 Conv부터 다시 시작하자',
           description:
             '먼저 Block Library에서 CNN Layer를 선택해봅시다. 이제부터는 이미지 패턴을 읽는 구조를 직접 쌓아갈 거예요.',
-          targetName: 'tutorial-block-library',
+          targetName: 'tutorial-cnn-block',
           canAdvance: false,
         },
         'cnn11-linear-limit': {
@@ -1125,9 +1293,10 @@ export function BuilderShell() {
           advanceLabel: 'CNN으로 바꿔보자',
         },
         'cnn11-retrain-cnn': {
-          title: 'CNN으로 다시 학습해보자',
-          description:
-            '좋아요. 이제 `1→32 Conv / Pool / 32→64 Conv / Pool / Linear / Linear` 구조가 준비됐습니다. Start를 눌러 다시 학습하고, 세탁물 분류가 얼마나 안정적으로 올라가는지 확인해보세요.',
+          title: isCnn13TutorialActive ? '앨범 분류 기준 CNN 학습' : 'CNN으로 다시 학습해보자',
+          description: isCnn13TutorialActive
+            ? '좋아요. 이제 `3→32 Conv → 32→32 Conv → Pool → 32→64 Conv → 64→64 Conv → Pool → Linear → Linear` 구조가 준비됐습니다. Start를 눌러 증강 없는 앨범 분류 기준선을 먼저 확인해보세요.'
+            : '좋아요. 이제 `1→32 Conv → 32→32 Conv → Pool → 32→64 Conv → 64→64 Conv → Pool → Linear → Linear` 구조가 준비됐습니다. Start를 눌러 다시 학습하고, 세탁물 분류가 얼마나 안정적으로 올라가는지 확인해보세요.',
           targetName: 'tutorial-start-button',
           canAdvance: false,
         },
@@ -1139,6 +1308,108 @@ export function BuilderShell() {
           canAdvance: true,
           advanceLabel: '미션으로 갈게요',
         },
+        'cnn12-intro': {
+          title: '기준 CNN부터 한 번 돌려보자',
+          description:
+            '이번 실습은 CNN 표현력을 올리는 흐름입니다. 먼저 `Conv → Conv → Pool → Conv → Conv → Pool → Linear` 기준 모델을 Start로 학습해보고, 이 구조가 어디서 더 커질 수 있는지 확인합니다.',
+          targetName: 'tutorial-start-button',
+          canAdvance: false,
+        },
+        'cnn12-add-third-cnn': {
+          title: 'Feature Builder: 128채널 Conv 추가',
+          description:
+            '기준 구조는 두 번씩 묶어 특징을 읽었습니다. 이제 Linear 앞에 128채널 Conv를 하나 더 추가해 더 깊은 feature map을 만들어보겠습니다. Block Library에서 CNN Layer를 선택해주세요.',
+          targetName: 'tutorial-cnn-block',
+          canAdvance: false,
+        },
+        'cnn12-place-third-cnn': {
+          title: '128채널 Conv를 Linear 앞에 연결',
+          description:
+            '새 CNN Layer를 Builder Canvas에 올려주세요. 두 번째 Pooling 뒤, 첫 번째 Linear 앞에 들어가면 기존 64채널 feature map을 더 풍부한 128채널 표현으로 바꿀 수 있습니다.',
+          targetName: 'tutorial-builder-canvas',
+          canAdvance: false,
+        },
+        'cnn12-set-third-cnn-in': {
+          title: '추가 Conv 입력 채널 맞추기',
+          description:
+            '기준 CNN의 마지막 Conv 묶음은 64채널 feature map을 만듭니다. 추가 CNN Layer의 `Channel In`은 `64`가 되어야 합니다.',
+          targetName: 'tutorial-cnn5-channel-in-field',
+          canAdvance: false,
+        },
+        'cnn12-set-third-cnn-out': {
+          title: '출력 채널을 128로 확장',
+          description:
+            '이번 층은 더 많은 패턴 조합을 만들기 위한 feature builder입니다. 세 번째 CNN Layer의 `Channel Out`을 `128`로 설정해주세요.',
+          targetName: 'tutorial-cnn5-channel-out-field',
+          canAdvance: false,
+        },
+        'cnn12-match-head-input': {
+          title: 'Linear 입력 크기도 다시 계산',
+          description:
+            '채널이 128로 늘었으니 Flatten 뒤 feature 수가 `128 x 7 x 7 = 6272`가 됩니다. 첫 번째 Linear Layer의 `Input`을 `6272`로 맞춰주세요.',
+          targetName: 'tutorial-linear-input-field',
+          canAdvance: true,
+          advanceLabel: '6272로 맞췄어요',
+        },
+        'cnn12-retrain': {
+          title: '깊어진 CNN으로 다시 학습',
+          description:
+            '이제 `32 → 64 → 128` 채널 흐름이 만들어졌습니다. Start를 눌러 더 깊어진 feature map이 Val Acc에 어떤 차이를 만드는지 확인해보세요.',
+          targetName: 'tutorial-start-button',
+          canAdvance: false,
+        },
+        'cnn12-success': {
+          title: 'Feature Builder 흐름 완료',
+          description:
+            '좋아요. CNN은 단순히 레이어 수를 늘리는 게 아니라, 낮은 단계의 edge/texture를 더 높은 단계의 shape 조합으로 쌓아가는 구조라는 점이 핵심입니다.',
+          targetName: 'tutorial-training-metrics',
+          canAdvance: true,
+          advanceLabel: '확인했어요',
+        },
+        'cnn13-intro': {
+          title: '자동 앨범 분류기 기준선 만들기',
+          description:
+            '이번에는 업로드된 사진을 동물, 탈것, 야외 장면 같은 앨범으로 자동 정리하는 CNN을 만든다고 생각하면 됩니다. 먼저 현재 구조 그대로 Start해서 증강 없는 앨범 분류기의 기준 성능을 확인해보세요.',
+          targetName: 'tutorial-start-button',
+          canAdvance: false,
+        },
+        'cnn13-select-mixup': {
+          title: 'MixUp으로 비슷한 사진 사이를 부드럽게',
+          description:
+            '앨범 분류기는 고양이와 개, 자동차와 트럭처럼 비슷한 사진 사이에서 자주 흔들립니다. Augmentation 패널에서 MixUp을 켜서 두 사진과 라벨을 섞고, 클래스 경계를 더 부드럽게 만들어주세요.',
+          targetName: 'tutorial-augmentation-mixup',
+          canAdvance: false,
+        },
+        'cnn13-tune-mixup': {
+          title: 'Mix ratio를 확인',
+          description:
+            'Mix Ratio는 섞는 강도입니다. 너무 약하면 효과가 작고, 너무 강하면 원본 신호가 흐려집니다. 기본 45% 근처에서 시작하고 나중에 실험으로 조절하면 됩니다.',
+          targetName: 'tutorial-augmentation-mixup-strength',
+          canAdvance: true,
+          advanceLabel: '다음 증강 볼게요',
+        },
+        'cnn13-select-cutmix': {
+          title: 'CutMix로 가려진 사진에도 강하게',
+          description:
+            '실제 앨범 사진은 물체가 잘리거나 배경에 가려지는 경우가 많습니다. CutMix를 켜서 일부 패치가 바뀌어도 모델이 전체 맥락과 부분 특징을 함께 보게 만들어주세요.',
+          targetName: 'tutorial-augmentation-cutmix',
+          canAdvance: false,
+        },
+        'cnn13-retrain': {
+          title: '앨범 분류기를 증강 데이터로 재학습',
+          description:
+            'MixUp과 CutMix가 켜졌습니다. Start를 눌러 같은 CNN 구조라도 사진 분포를 더 다양하게 보여주면 검증 성능과 안정성이 어떻게 달라지는지 확인해보세요.',
+          targetName: 'tutorial-start-button',
+          canAdvance: false,
+        },
+        'cnn13-success': {
+          title: '자동 앨범 분류기 튜닝 완료',
+          description:
+            '좋습니다. 자동 앨범 분류기는 단순히 학습 사진을 외우면 새 사진에서 금방 흔들립니다. 데이터 증강은 모델 구조를 바꾸지 않고도 더 넓은 사진 분포를 보게 해서 일반화 성능을 끌어올리는 핵심 튜닝입니다.',
+          targetName: 'tutorial-training-metrics',
+          canAdvance: true,
+          advanceLabel: '확인했어요',
+        },
       }) satisfies Record<
         LessonCoachStep,
         {
@@ -1149,14 +1420,91 @@ export function BuilderShell() {
           advanceLabel?: string;
         }
       >,
-    [],
+    [isCnn13TutorialActive],
   );
   const activeLessonCoachStep = lessonCoachStep ? lessonCoachCopy[lessonCoachStep] : null;
-  const reopenMlp12Guide = () => {
+  const reopenLessonGuide = () => {
     setLessonCoachStep(lastDismissedLessonCoachStepRef.current);
   };
+  const handleLibraryBlockDragStart = (type: BlockType) => {
+    blockDropCompletedRef.current = false;
+    setDraggingBlock(type);
+  };
+  const handleLibraryBlockDragEnd = () => {
+    if (!blockDropCompletedRef.current) {
+      setLessonCoachStep((current) => {
+        const rewindMap: Partial<Record<LessonCoachStep, LessonCoachStep>> = {
+          'cnn11-place-first-cnn': 'cnn11-upgrade-cnn',
+          'cnn11-place-second-cnn': 'cnn11-match-linear',
+          'cnn11-place-first-pool': 'cnn11-add-linear',
+          'cnn11-place-third-cnn': 'cnn11-add-third-cnn',
+          'cnn11-place-fourth-cnn': 'cnn11-add-fourth-cnn',
+          'cnn11-place-second-pool': 'cnn11-add-second-pool',
+          'cnn11-place-head-linear': 'cnn11-add-head-linear',
+          'cnn11-place-output-linear': 'cnn11-add-output-linear',
+          'cnn12-place-third-cnn': 'cnn12-add-third-cnn',
+        };
+        return current ? (rewindMap[current] ?? current) : current;
+      });
+
+      if (isMnistTutorialActive && tutorialStep === 'stack-block' && !linearNodeExists) {
+        setTutorialStep('build-model');
+      }
+    }
+
+    blockDropCompletedRef.current = false;
+    setDraggingBlock(null);
+  };
+  useEffect(() => {
+    if (!draggingBlock) {
+      return;
+    }
+
+    let frameId: number | null = null;
+    let pendingScroll = 0;
+    const edgeSize = 140;
+    const maxStep = 42;
+
+    const handleDragAutoScroll = (event: DragEvent) => {
+      const bottomDistance = window.innerHeight - event.clientY;
+      const topDistance = event.clientY;
+      let nextScroll = 0;
+
+      if (bottomDistance < edgeSize) {
+        nextScroll = Math.ceil(((edgeSize - bottomDistance) / edgeSize) * maxStep);
+      } else if (topDistance < edgeSize) {
+        nextScroll = -Math.ceil(((edgeSize - topDistance) / edgeSize) * maxStep);
+      }
+
+      if (nextScroll === 0) {
+        pendingScroll = 0;
+        return;
+      }
+
+      event.preventDefault();
+      pendingScroll = nextScroll;
+
+      if (frameId !== null) {
+        return;
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null;
+        window.scrollBy({ top: pendingScroll, behavior: 'auto' });
+      });
+    };
+
+    window.addEventListener('dragover', handleDragAutoScroll);
+
+    return () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId);
+      }
+      window.removeEventListener('dragover', handleDragAutoScroll);
+    };
+  }, [draggingBlock]);
   const resolveCurrentCnn11GuideStep = (): LessonCoachStep => {
-    if (isCnn11ArchitectureReady) {
+    if (isBaseCnnArchitectureReady) {
       return 'cnn11-retrain-cnn';
     }
     if (linearNodeCount >= 2 && cnnOutputValue === '10') {
@@ -1168,26 +1516,41 @@ export function BuilderShell() {
     if (linearNodeCount >= 2) {
       return 'cnn11-set-output-linear-input';
     }
-    if (draggingBlock === 'linear' && linearNodeCount >= 1) {
-      return 'cnn11-place-output-linear';
-    }
     if (linearNodeCount >= 1 && cnnHeadOutputValue === '128') {
       return 'cnn11-add-output-linear';
     }
-    if (linearNodeCount >= 1 && cnnHeadInputValue === '3136') {
+    if (linearNodeCount >= 1 && cnnHeadInputValue === baseCnnHeadInputTarget) {
       return 'cnn11-set-head-linear-output';
     }
     if (linearNodeCount >= 1) {
       return 'cnn11-set-head-linear-input';
     }
-    if (draggingBlock === 'linear' && poolingNodeCount >= 2) {
-      return 'cnn11-place-head-linear';
-    }
     if (poolingNodeCount >= 2) {
       return 'cnn11-add-head-linear';
     }
-    if (cnnNodeCount >= 2 && secondCnnOutValue === '64') {
+    if (cnnNodeCount >= 4 && fourthCnnOutValue === '64') {
       return 'cnn11-add-second-pool';
+    }
+    if (cnnNodeCount >= 4 && fourthCnnInValue === '64') {
+      return 'cnn11-set-fourth-cnn-out';
+    }
+    if (cnnNodeCount >= 4) {
+      return 'cnn11-set-fourth-cnn-in';
+    }
+    if (cnnNodeCount >= 3 && thirdCnnOutValue === '64') {
+      return 'cnn11-add-fourth-cnn';
+    }
+    if (cnnNodeCount >= 3 && thirdCnnInValue === '32') {
+      return 'cnn11-set-third-cnn-out';
+    }
+    if (cnnNodeCount >= 3) {
+      return 'cnn11-set-third-cnn-in';
+    }
+    if (poolingNodeCount >= 1) {
+      return 'cnn11-add-third-cnn';
+    }
+    if (cnnNodeCount >= 2 && secondCnnOutValue === '32') {
+      return 'cnn11-add-linear';
     }
     if (cnnNodeCount >= 2 && secondCnnInValue === '32') {
       return 'cnn11-set-second-cnn-out';
@@ -1195,35 +1558,43 @@ export function BuilderShell() {
     if (cnnNodeCount >= 2) {
       return 'cnn11-set-second-cnn-in';
     }
-    if (draggingBlock === 'cnn' && poolingNodeCount >= 1) {
-      return 'cnn11-place-second-cnn';
-    }
-    if (poolingNodeCount >= 1) {
+    if (cnnNodeCount >= 1 && firstCnnOutValue === '32') {
       return 'cnn11-match-linear';
     }
-    if (draggingBlock === 'pooling' && cnnNodeCount >= 1) {
-      return 'cnn11-place-first-pool';
-    }
-    if (cnnNodeCount >= 1 && firstCnnOutValue === '32') {
-      return 'cnn11-add-linear';
-    }
-    if (cnnNodeCount >= 1 && firstCnnInValue === '1') {
+    if (cnnNodeCount >= 1 && firstCnnInValue === baseCnnInputChannelsTarget) {
       return 'cnn11-set-first-cnn-out';
     }
     if (cnnNodeCount >= 1) {
       return 'cnn11-set-first-cnn-in';
     }
-    if (draggingBlock === 'cnn') {
-      return 'cnn11-place-first-cnn';
-    }
     return 'cnn11-stack-linear';
+  };
+  const resolveCurrentCnn12GuideStep = (): LessonCoachStep => {
+    if (isCnn12ArchitectureReady) {
+      return 'cnn12-retrain';
+    }
+    if (cnnNodeCount >= 5 && fifthCnnOutValue === '128') {
+      return cnnHeadInputValue === '6272' ? 'cnn12-retrain' : 'cnn12-match-head-input';
+    }
+    if (cnnNodeCount >= 5 && fifthCnnInValue === '64') {
+      return 'cnn12-set-third-cnn-out';
+    }
+    if (cnnNodeCount >= 5) {
+      return 'cnn12-set-third-cnn-in';
+    }
+    if (isBaseCnnArchitectureReady) {
+      return trainingStatus?.status === 'completed' && trainingStatus.datasetId === 'fashion_mnist'
+        ? 'cnn12-add-third-cnn'
+        : 'cnn11-retrain-cnn';
+    }
+    return resolveCurrentCnn11GuideStep();
   };
   const openStoryQuest = () => {
     if (isStoryTutorialMissionReady) {
       if (isMnistTutorialActive) {
         lastDismissedTutorialStepRef.current = tutorialStep;
       }
-      if (isCnn11TutorialActive && lessonCoachStep) {
+      if ((isCnn11TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive) && lessonCoachStep) {
         lastDismissedLessonCoachStepRef.current = lessonCoachStep;
         setLessonCoachStep(null);
       }
@@ -1269,12 +1640,15 @@ export function BuilderShell() {
       return;
     }
 
-    if (isCnn11TutorialActive && tutorialStep === 'build-model') {
-      const fallbackStep = lessonCoachStep ?? lastDismissedLessonCoachStepRef.current ?? resolveCurrentCnn11GuideStep();
+    if ((isCnn11TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive) && tutorialStep === 'build-model') {
+      const resolvedGuideStep = isCnn12TutorialActive
+        ? resolveCurrentCnn12GuideStep()
+        : resolveCurrentCnn11GuideStep();
+      const fallbackStep = lessonCoachStep ?? lastDismissedLessonCoachStepRef.current ?? resolvedGuideStep;
       const inferredStep =
         fallbackStep === 'cnn11-stack-linear' || fallbackStep === 'cnn11-linear-limit' || fallbackStep === 'cnn11-success'
           ? fallbackStep
-          : resolveCurrentCnn11GuideStep();
+          : resolvedGuideStep;
       setTutorialGuideOpen(false);
       setIsMnistMissionMinimized(false);
       lastDismissedLessonCoachStepRef.current = inferredStep;
@@ -1397,8 +1771,28 @@ export function BuilderShell() {
   };
 
   const exitMnistQuest = () => {
-    const currentLessonId = isCnn11TutorialActive ? 'cnn-1-1' : 'mlp-1-1';
-    const nextLessonId = isCnn11TutorialActive ? 'cnn-1-2' : 'mlp-1-2';
+    if (isCnn13TutorialActive) {
+      const currentLessonId = 'cnn-1-3';
+      saveWorkspaceSnapshot('tutorial', currentLessonId, getTutorialLessonDatasetId(currentLessonId));
+      setTutorialGuideOpen(false);
+      setTutorialStep('build-model');
+      setTutorialPredictionDone(true);
+      setCnn11MissionRetryPending(false);
+      setIsMnistMissionMinimized(false);
+      setLessonCoachStep(null);
+      return;
+    }
+
+    const currentLessonId = isCnn12TutorialActive
+      ? 'cnn-1-2'
+      : isCnn11TutorialActive
+        ? 'cnn-1-1'
+        : 'mlp-1-1';
+    const nextLessonId = isCnn12TutorialActive
+      ? 'cnn-1-3'
+      : isCnn11TutorialActive
+        ? 'cnn-1-2'
+        : 'mlp-1-2';
     saveWorkspaceSnapshot('tutorial', currentLessonId, getTutorialLessonDatasetId(currentLessonId));
     setTutorialGuideOpen(false);
     setTutorialStep('story-intro');
@@ -1413,7 +1807,11 @@ export function BuilderShell() {
       getTutorialLessonDatasetId(nextLessonId),
     );
     applyLessonTrainingDefaults(nextLessonId);
-    setLessonCoachStep(nextLessonId === 'mlp-1-2' ? (hasSnapshot ? null : 'mlp12-intro') : null);
+    const nextCoachStep = hasSnapshot ? null : getInitialLessonCoachStep(nextLessonId);
+    if (nextCoachStep) {
+      lastDismissedLessonCoachStepRef.current = nextCoachStep;
+    }
+    setLessonCoachStep(nextCoachStep);
   };
 
   const saveWorkspaceSnapshot = (
@@ -1476,12 +1874,36 @@ export function BuilderShell() {
       return;
     }
 
-    if (lessonId === 'cnn-1-1') {
+    if (lessonId === 'cnn-1-1' || lessonId === 'cnn-1-2' || lessonId === 'cnn-1-3') {
       setOptimizer('AdamW');
       setLearningRate(optimizerConfigs.AdamW.defaultLearningRate);
       setEpochs('10');
       setBatchSize(128);
     }
+  };
+
+  const openTutorialLesson = (lessonId: string) => {
+    saveWorkspaceSnapshot(activeWorkspace, selectedTutorialLessonId, selectedDatasetId);
+    clearTrainingUiState();
+    resetBoard();
+    setActiveWorkspace('tutorial');
+    setSelectedTutorialLessonId(lessonId);
+    setTutorialGuideOpen(lessonId === 'mlp-1-1');
+    setTutorialStep('story-intro');
+    setTutorialPredictionDone(false);
+    setIsMnistMissionMinimized(false);
+    setCnn11BaselineChallengeSamples(null);
+    if (lessonId === 'cnn-1-3') {
+      setSelectedAugmentations([]);
+      setAugmentationParams(defaultAugmentationParams);
+    }
+    restoreWorkspaceSnapshot('tutorial', lessonId, getTutorialLessonDatasetId(lessonId));
+    applyLessonTrainingDefaults(lessonId);
+    const initialCoachStep = getInitialLessonCoachStep(lessonId);
+    if (initialCoachStep) {
+      lastDismissedLessonCoachStepRef.current = initialCoachStep;
+    }
+    setLessonCoachStep(initialCoachStep);
   };
 
   const surfaceTrainingError = (message: string, jobId: string | null = currentJobId) => {
@@ -1555,6 +1977,10 @@ export function BuilderShell() {
   }, [activeWorkspace, runtimeDatasetId, selectedTutorialLessonId]);
 
   useEffect(() => {
+    if (activeWorkspace === 'tutorial' && selectedTutorialLessonId !== 'mlp-1-1' && selectedTutorialLessonId !== 'cnn-1-1') {
+      return;
+    }
+
     if (isCnn11TutorialActive) {
       return;
     }
@@ -1575,7 +2001,15 @@ export function BuilderShell() {
       setIsMnistMissionMinimized(false);
       setCnn11MissionRetryPending(false);
     }
-  }, [currentJobId, isCnn11TutorialActive, isMnistTutorialActive, nodes.length, selectedDatasetId]);
+  }, [
+    activeWorkspace,
+    currentJobId,
+    isCnn11TutorialActive,
+    isMnistTutorialActive,
+    nodes.length,
+    selectedDatasetId,
+    selectedTutorialLessonId,
+  ]);
 
   useEffect(() => {
     if (!isMnistTutorialActive) {
@@ -1633,20 +2067,20 @@ export function BuilderShell() {
   ]);
 
   useEffect(() => {
-    if (!isCnn11TutorialActive) {
+    if (!isCnn11TutorialActive && !isCnn12TutorialActive && !isCnn13TutorialActive) {
       return;
     }
 
     if (tutorialStep === 'play-mission' && tutorialPredictionDone) {
       setTutorialStep('complete');
     }
-  }, [isCnn11TutorialActive, tutorialPredictionDone, tutorialStep]);
+  }, [isCnn11TutorialActive, isCnn12TutorialActive, isCnn13TutorialActive, tutorialPredictionDone, tutorialStep]);
 
   useEffect(() => {
-    if (isCnn11TutorialActive && tutorialGuideOpen) {
+    if ((isCnn11TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive) && tutorialGuideOpen) {
       setTutorialGuideOpen(false);
     }
-  }, [isCnn11TutorialActive, tutorialGuideOpen]);
+  }, [isCnn11TutorialActive, isCnn12TutorialActive, isCnn13TutorialActive, tutorialGuideOpen]);
 
   useEffect(() => {
     if (!isMnistTutorialActive) {
@@ -1674,46 +2108,91 @@ export function BuilderShell() {
     if (lessonCoachStep === 'cnn11-upgrade-cnn' && draggingBlock === 'cnn') {
       setLessonCoachStep('cnn11-place-first-cnn');
     }
-    if (lessonCoachStep === 'cnn11-place-first-cnn' && cnnNodeCount >= 1) {
+    if (
+      (lessonCoachStep === 'cnn11-upgrade-cnn' || lessonCoachStep === 'cnn11-place-first-cnn') &&
+      cnnNodeCount >= 1
+    ) {
       setLessonCoachStep('cnn11-set-first-cnn-in');
     }
-    if (lessonCoachStep === 'cnn11-set-first-cnn-in' && firstCnnInValue === '1') {
+    if (lessonCoachStep === 'cnn11-set-first-cnn-in' && firstCnnInValue === baseCnnInputChannelsTarget) {
       setLessonCoachStep('cnn11-set-first-cnn-out');
     }
     if (lessonCoachStep === 'cnn11-set-first-cnn-out' && firstCnnOutValue === '32') {
-      setLessonCoachStep('cnn11-add-linear');
-    }
-    if (lessonCoachStep === 'cnn11-add-linear' && draggingBlock === 'pooling') {
-      setLessonCoachStep('cnn11-place-first-pool');
-    }
-    if (lessonCoachStep === 'cnn11-place-first-pool' && poolingNodeCount >= 1) {
       setLessonCoachStep('cnn11-match-linear');
     }
     if (lessonCoachStep === 'cnn11-match-linear' && draggingBlock === 'cnn') {
       setLessonCoachStep('cnn11-place-second-cnn');
     }
-    if (lessonCoachStep === 'cnn11-place-second-cnn' && cnnNodeCount >= 2) {
+    if (
+      (lessonCoachStep === 'cnn11-match-linear' || lessonCoachStep === 'cnn11-place-second-cnn') &&
+      cnnNodeCount >= 2
+    ) {
       setLessonCoachStep('cnn11-set-second-cnn-in');
     }
     if (lessonCoachStep === 'cnn11-set-second-cnn-in' && secondCnnInValue === '32') {
       setLessonCoachStep('cnn11-set-second-cnn-out');
     }
-    if (lessonCoachStep === 'cnn11-set-second-cnn-out' && secondCnnOutValue === '64') {
+    if (lessonCoachStep === 'cnn11-set-second-cnn-out' && secondCnnOutValue === '32') {
+      setLessonCoachStep('cnn11-add-linear');
+    }
+    if (lessonCoachStep === 'cnn11-add-linear' && draggingBlock === 'pooling') {
+      setLessonCoachStep('cnn11-place-first-pool');
+    }
+    if (
+      (lessonCoachStep === 'cnn11-add-linear' || lessonCoachStep === 'cnn11-place-first-pool') &&
+      poolingNodeCount >= 1
+    ) {
+      setLessonCoachStep('cnn11-add-third-cnn');
+    }
+    if (lessonCoachStep === 'cnn11-add-third-cnn' && draggingBlock === 'cnn') {
+      setLessonCoachStep('cnn11-place-third-cnn');
+    }
+    if (
+      (lessonCoachStep === 'cnn11-add-third-cnn' || lessonCoachStep === 'cnn11-place-third-cnn') &&
+      cnnNodeCount >= 3
+    ) {
+      setLessonCoachStep('cnn11-set-third-cnn-in');
+    }
+    if (lessonCoachStep === 'cnn11-set-third-cnn-in' && thirdCnnInValue === '32') {
+      setLessonCoachStep('cnn11-set-third-cnn-out');
+    }
+    if (lessonCoachStep === 'cnn11-set-third-cnn-out' && thirdCnnOutValue === '64') {
+      setLessonCoachStep('cnn11-add-fourth-cnn');
+    }
+    if (lessonCoachStep === 'cnn11-add-fourth-cnn' && draggingBlock === 'cnn') {
+      setLessonCoachStep('cnn11-place-fourth-cnn');
+    }
+    if (
+      (lessonCoachStep === 'cnn11-add-fourth-cnn' || lessonCoachStep === 'cnn11-place-fourth-cnn') &&
+      cnnNodeCount >= 4
+    ) {
+      setLessonCoachStep('cnn11-set-fourth-cnn-in');
+    }
+    if (lessonCoachStep === 'cnn11-set-fourth-cnn-in' && fourthCnnInValue === '64') {
+      setLessonCoachStep('cnn11-set-fourth-cnn-out');
+    }
+    if (lessonCoachStep === 'cnn11-set-fourth-cnn-out' && fourthCnnOutValue === '64') {
       setLessonCoachStep('cnn11-add-second-pool');
     }
     if (lessonCoachStep === 'cnn11-add-second-pool' && draggingBlock === 'pooling') {
       setLessonCoachStep('cnn11-place-second-pool');
     }
-    if (lessonCoachStep === 'cnn11-place-second-pool' && poolingNodeCount >= 2) {
+    if (
+      (lessonCoachStep === 'cnn11-add-second-pool' || lessonCoachStep === 'cnn11-place-second-pool') &&
+      poolingNodeCount >= 2
+    ) {
       setLessonCoachStep('cnn11-add-head-linear');
     }
     if (lessonCoachStep === 'cnn11-add-head-linear' && draggingBlock === 'linear') {
       setLessonCoachStep('cnn11-place-head-linear');
     }
-    if (lessonCoachStep === 'cnn11-place-head-linear' && linearNodeCount >= 1) {
+    if (
+      (lessonCoachStep === 'cnn11-add-head-linear' || lessonCoachStep === 'cnn11-place-head-linear') &&
+      linearNodeCount >= 1
+    ) {
       setLessonCoachStep('cnn11-set-head-linear-input');
     }
-    if (lessonCoachStep === 'cnn11-set-head-linear-input' && cnnHeadInputValue === '3136') {
+    if (lessonCoachStep === 'cnn11-set-head-linear-input' && cnnHeadInputValue === baseCnnHeadInputTarget) {
       setLessonCoachStep('cnn11-set-head-linear-output');
     }
     if (lessonCoachStep === 'cnn11-set-head-linear-output' && cnnHeadOutputValue === '128') {
@@ -1722,7 +2201,10 @@ export function BuilderShell() {
     if (lessonCoachStep === 'cnn11-add-output-linear' && draggingBlock === 'linear') {
       setLessonCoachStep('cnn11-place-output-linear');
     }
-    if (lessonCoachStep === 'cnn11-place-output-linear' && linearNodeCount >= 2) {
+    if (
+      (lessonCoachStep === 'cnn11-add-output-linear' || lessonCoachStep === 'cnn11-place-output-linear') &&
+      linearNodeCount >= 2
+    ) {
       setLessonCoachStep('cnn11-set-output-linear-input');
     }
     if (lessonCoachStep === 'cnn11-set-output-linear-input' && cnnOutputInputValue === '128') {
@@ -1737,10 +2219,33 @@ export function BuilderShell() {
     ) {
       setLessonCoachStep('cnn11-retrain-cnn');
     }
+    if (
+      (lessonCoachStep === 'cnn12-add-third-cnn' || lessonCoachStep === 'cnn12-place-third-cnn') &&
+      cnnNodeCount >= 5
+    ) {
+      setLessonCoachStep('cnn12-set-third-cnn-in');
+    }
+    if (lessonCoachStep === 'cnn12-add-third-cnn' && draggingBlock === 'cnn') {
+      setLessonCoachStep('cnn12-place-third-cnn');
+    }
+    if (lessonCoachStep === 'cnn12-set-third-cnn-in' && fifthCnnInValue === '64') {
+      setLessonCoachStep('cnn12-set-third-cnn-out');
+    }
+    if (lessonCoachStep === 'cnn12-set-third-cnn-out' && fifthCnnOutValue === '128') {
+      setLessonCoachStep('cnn12-match-head-input');
+    }
+    if (lessonCoachStep === 'cnn13-select-mixup' && selectedAugmentations.includes('mixup')) {
+      setLessonCoachStep('cnn13-tune-mixup');
+    }
+    if (lessonCoachStep === 'cnn13-select-cutmix' && selectedAugmentations.includes('cutmix')) {
+      setLessonCoachStep('cnn13-retrain');
+    }
   }, [
     cnnHeadInputValue,
     cnnHeadOutputValue,
     cnnNodeCount,
+    baseCnnHeadInputTarget,
+    baseCnnInputChannelsTarget,
     firstCnnInValue,
     firstCnnOutValue,
     isCnn11ArchitectureReady,
@@ -1752,6 +2257,13 @@ export function BuilderShell() {
     cnnOutputValue,
     secondCnnInValue,
     secondCnnOutValue,
+    selectedAugmentations,
+    thirdCnnInValue,
+    thirdCnnOutValue,
+    fourthCnnInValue,
+    fourthCnnOutValue,
+    fifthCnnInValue,
+    fifthCnnOutValue,
     draggingBlock,
   ]);
 
@@ -1808,7 +2320,79 @@ export function BuilderShell() {
   }, [cnn11MissionRetryPending, isCnn11ArchitectureReady, isCnn11TutorialActive, trainingStatus]);
 
   useEffect(() => {
+    if (!isCnn12TutorialActive || trainingStatus?.status !== 'completed' || !trainingStatus.jobId) {
+      return;
+    }
+
+    if (lastLessonHandledJobIdRef.current === trainingStatus.jobId) {
+      return;
+    }
+    lastLessonHandledJobIdRef.current = trainingStatus.jobId;
+
+    if (isCnn12ArchitectureReady) {
+      setLessonCoachStep('cnn12-success');
+      return;
+    }
+
+    if (cnnNodeCount >= 5 && fifthCnnInValue === '64' && fifthCnnOutValue === '128') {
+      setLessonCoachStep(cnnHeadInputValue === '6272' ? 'cnn12-retrain' : 'cnn12-match-head-input');
+      return;
+    }
+
+    setLessonCoachStep(cnnNodeCount >= 5 ? 'cnn12-set-third-cnn-in' : 'cnn12-add-third-cnn');
+  }, [
+    cnnHeadInputValue,
+    cnnNodeCount,
+    isCnn12ArchitectureReady,
+    isCnn12TutorialActive,
+    fifthCnnInValue,
+    fifthCnnOutValue,
+    trainingStatus,
+  ]);
+
+  useEffect(() => {
+    if (!isCnn13TutorialActive || trainingStatus?.status !== 'completed' || !trainingStatus.jobId) {
+      return;
+    }
+
+    if (lastLessonHandledJobIdRef.current === trainingStatus.jobId) {
+      return;
+    }
+    lastLessonHandledJobIdRef.current = trainingStatus.jobId;
+
+    if (hasCifarAugmentationPair) {
+      setLessonCoachStep('cnn13-success');
+      return;
+    }
+
+    if (selectedAugmentations.includes('mixup')) {
+      setLessonCoachStep('cnn13-select-cutmix');
+      return;
+    }
+
+    if (isCnn13ArchitectureReady) {
+      setTutorialGuideOpen(false);
+      setLessonCoachStep(null);
+      setTutorialStep('play-mission');
+      setIsMnistMissionMinimized(false);
+      return;
+    }
+
+    setLessonCoachStep(resolveCurrentCnn11GuideStep());
+  }, [
+    hasCifarAugmentationPair,
+    isCnn13ArchitectureReady,
+    isCnn13TutorialActive,
+    selectedAugmentations,
+    trainingStatus,
+  ]);
+
+  useEffect(() => {
     if (!isStoryTutorialMissionReady || !trainingStatus?.jobId || tutorialPredictionDone) {
+      return;
+    }
+
+    if (isCnn13TutorialActive && hasCifarAugmentationPair) {
       return;
     }
 
@@ -1821,7 +2405,7 @@ export function BuilderShell() {
     if (isMnistTutorialActive) {
       lastDismissedTutorialStepRef.current = tutorialStep;
     }
-    if (isCnn11TutorialActive && lessonCoachStep) {
+    if ((isCnn11TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive) && lessonCoachStep) {
       lastDismissedLessonCoachStepRef.current = lessonCoachStep;
       setLessonCoachStep(null);
     }
@@ -1832,6 +2416,9 @@ export function BuilderShell() {
     setCnn11MissionRetryPending(false);
   }, [
     isCnn11TutorialActive,
+    isCnn12TutorialActive,
+    isCnn13TutorialActive,
+    hasCifarAugmentationPair,
     isMnistTutorialActive,
     isStoryTutorialMissionReady,
     lessonCoachStep,
@@ -2062,6 +2649,8 @@ export function BuilderShell() {
     void (async () => {
       if (
         isMlp12TutorialActive ||
+        isCnn12TutorialActive ||
+        isCnn13TutorialActive ||
         lessonCoachStep === 'cnn11-stack-linear' ||
         lessonCoachStep === 'cnn11-train-linear' ||
         lessonCoachStep === 'cnn11-retrain-cnn'
@@ -2332,8 +2921,13 @@ export function BuilderShell() {
       )) ||
     (isCnn11TutorialActive &&
       tutorialStep === 'build-model');
+  const shouldHideBottomActionForLessonCoach =
+    activeWorkspace === 'tutorial' &&
+    lessonCoachStep !== null &&
+    activeLessonCoachStep?.targetName !== 'tutorial-start-button';
   const isBottomActionVisible =
     !isCompetitionRankOpen &&
+    !shouldHideBottomActionForLessonCoach &&
     (activeWorkspace === 'builder' ||
       (activeWorkspace === 'competition' && competitionRoom !== null) ||
       (activeWorkspace === 'tutorial' &&
@@ -2387,6 +2981,7 @@ export function BuilderShell() {
               selectedTutorialLessonId={selectedTutorialLessonId}
               selectedStock={selectedStock}
               playgroundMode={playgroundMode}
+              reserveBottomActionSpace={isBottomActionVisible}
               onDatasetSelect={(datasetId) => {
                 if (activeWorkspace === 'competition') {
                   return;
@@ -2401,27 +2996,11 @@ export function BuilderShell() {
                 resetBoard();
                 setSelectedDatasetId(datasetId);
               }}
-              onTutorialLessonSelect={(lessonId) => {
-                saveWorkspaceSnapshot(activeWorkspace, selectedTutorialLessonId, selectedDatasetId);
-                clearTrainingUiState();
-                resetBoard();
-                setActiveWorkspace('tutorial');
-                setSelectedTutorialLessonId(lessonId);
-                setTutorialGuideOpen(lessonId === 'mlp-1-1');
-                setTutorialStep('story-intro');
-                setTutorialPredictionDone(false);
-                setIsMnistMissionMinimized(false);
-                setCnn11BaselineChallengeSamples(null);
-                restoreWorkspaceSnapshot('tutorial', lessonId, getTutorialLessonDatasetId(lessonId));
-                applyLessonTrainingDefaults(lessonId);
-                setLessonCoachStep(
-                  lessonId === 'mlp-1-2' ? 'mlp12-intro' : null,
-                );
-              }}
+              onTutorialLessonSelect={openTutorialLesson}
               onStockSelect={setSelectedStock}
               onPlaygroundModeSelect={setPlaygroundMode}
-              onBlockDragStart={setDraggingBlock}
-              onBlockDragEnd={() => setDraggingBlock(null)}
+              onBlockDragStart={handleLibraryBlockDragStart}
+              onBlockDragEnd={handleLibraryBlockDragEnd}
             />
           )}
           {activeWorkspace === 'home' ? (
@@ -2452,6 +3031,7 @@ export function BuilderShell() {
               <LearningWorkspacePanel
                 requestedChapterId={selectedLearningChapterId}
                 onRequestedChapterHandled={() => setSelectedLearningChapterId(null)}
+                onGoToTutorial={openTutorialLesson}
               />
             </div>
           ) : activeWorkspace === 'competition' && !competitionRoom ? (
@@ -2635,13 +3215,20 @@ export function BuilderShell() {
                     lessonCoachStep === 'cnn11-set-first-cnn-out'
                       ? 'cnn'
                       : lessonCoachStep === 'cnn11-set-second-cnn-in' ||
-                          lessonCoachStep === 'cnn11-set-second-cnn-out'
+                          lessonCoachStep === 'cnn11-set-second-cnn-out' ||
+                          lessonCoachStep === 'cnn11-set-third-cnn-in' ||
+                          lessonCoachStep === 'cnn11-set-third-cnn-out' ||
+                          lessonCoachStep === 'cnn11-set-fourth-cnn-in' ||
+                          lessonCoachStep === 'cnn11-set-fourth-cnn-out' ||
+                          lessonCoachStep === 'cnn12-set-third-cnn-in' ||
+                          lessonCoachStep === 'cnn12-set-third-cnn-out'
                         ? 'cnn'
                         : lessonCoachStep === 'cnn11-set-head-linear-input' ||
                             lessonCoachStep === 'cnn11-set-head-linear-output' ||
                             lessonCoachStep === 'cnn11-set-output-linear-input' ||
                             lessonCoachStep === 'cnn11-set-output-linear-output' ||
-                            lessonCoachStep === 'cnn11-set-output-linear-activation'
+                            lessonCoachStep === 'cnn11-set-output-linear-activation' ||
+                            lessonCoachStep === 'cnn12-match-head-input'
                           ? 'linear'
                         : null
                   }
@@ -2652,8 +3239,18 @@ export function BuilderShell() {
                       : lessonCoachStep === 'cnn11-set-second-cnn-in' ||
                           lessonCoachStep === 'cnn11-set-second-cnn-out'
                         ? 1
+                        : lessonCoachStep === 'cnn11-set-third-cnn-in' ||
+                            lessonCoachStep === 'cnn11-set-third-cnn-out'
+                          ? 2
+                          : lessonCoachStep === 'cnn11-set-fourth-cnn-in' ||
+                              lessonCoachStep === 'cnn11-set-fourth-cnn-out'
+                            ? 3
+                            : lessonCoachStep === 'cnn12-set-third-cnn-in' ||
+                                lessonCoachStep === 'cnn12-set-third-cnn-out'
+                              ? 4
                         : lessonCoachStep === 'cnn11-set-head-linear-input' ||
-                            lessonCoachStep === 'cnn11-set-head-linear-output'
+                            lessonCoachStep === 'cnn11-set-head-linear-output' ||
+                            lessonCoachStep === 'cnn12-match-head-input'
                           ? 0
                           : lessonCoachStep === 'cnn11-set-output-linear-input' ||
                               lessonCoachStep === 'cnn11-set-output-linear-output' ||
@@ -2666,13 +3263,20 @@ export function BuilderShell() {
                     (isMlp12TutorialActive && lessonCoachStep === 'mlp12-match-input')
                       ? 'Input'
                       : lessonCoachStep === 'cnn11-set-first-cnn-in' ||
-                          lessonCoachStep === 'cnn11-set-second-cnn-in'
+                          lessonCoachStep === 'cnn11-set-second-cnn-in' ||
+                          lessonCoachStep === 'cnn11-set-third-cnn-in' ||
+                          lessonCoachStep === 'cnn11-set-fourth-cnn-in' ||
+                          lessonCoachStep === 'cnn12-set-third-cnn-in'
                         ? 'Channel In'
                         : lessonCoachStep === 'cnn11-set-head-linear-input' ||
-                            lessonCoachStep === 'cnn11-set-output-linear-input'
+                            lessonCoachStep === 'cnn11-set-output-linear-input' ||
+                            lessonCoachStep === 'cnn12-match-head-input'
                           ? 'Input'
                         : lessonCoachStep === 'cnn11-set-first-cnn-out' ||
-                            lessonCoachStep === 'cnn11-set-second-cnn-out'
+                            lessonCoachStep === 'cnn11-set-second-cnn-out' ||
+                            lessonCoachStep === 'cnn11-set-third-cnn-out' ||
+                            lessonCoachStep === 'cnn11-set-fourth-cnn-out' ||
+                            lessonCoachStep === 'cnn12-set-third-cnn-out'
                           ? 'Channel Out'
                         : isMnistTutorialActive && tutorialStep === 'edit-dimensions'
                           ? 'Output'
@@ -2689,11 +3293,24 @@ export function BuilderShell() {
                         ? 'tutorial-cnn-channel-in-field'
                         : lessonCoachStep === 'cnn11-set-first-cnn-out'
                           ? 'tutorial-cnn-channel-out-field'
-                          : lessonCoachStep === 'cnn11-set-second-cnn-in'
+                        : lessonCoachStep === 'cnn11-set-second-cnn-in'
                             ? 'tutorial-cnn2-channel-in-field'
                             : lessonCoachStep === 'cnn11-set-second-cnn-out'
                               ? 'tutorial-cnn2-channel-out-field'
-                              : lessonCoachStep === 'cnn11-set-head-linear-input'
+                              : lessonCoachStep === 'cnn11-set-third-cnn-in'
+                                ? 'tutorial-cnn3-channel-in-field'
+                                : lessonCoachStep === 'cnn11-set-third-cnn-out'
+                                  ? 'tutorial-cnn3-channel-out-field'
+                                  : lessonCoachStep === 'cnn11-set-fourth-cnn-in'
+                                    ? 'tutorial-cnn4-channel-in-field'
+                                    : lessonCoachStep === 'cnn11-set-fourth-cnn-out'
+                                      ? 'tutorial-cnn4-channel-out-field'
+                                      : lessonCoachStep === 'cnn12-set-third-cnn-in'
+                                        ? 'tutorial-cnn5-channel-in-field'
+                                        : lessonCoachStep === 'cnn12-set-third-cnn-out'
+                                          ? 'tutorial-cnn5-channel-out-field'
+                                          : lessonCoachStep === 'cnn11-set-head-linear-input' ||
+                                              lessonCoachStep === 'cnn12-match-head-input'
                                 ? 'tutorial-linear-input-field'
                                 : lessonCoachStep === 'cnn11-set-head-linear-output'
                                   ? 'tutorial-linear-output-field'
@@ -2733,13 +3350,19 @@ export function BuilderShell() {
                       setDraggingBlock(null);
                       return;
                     }
+                    blockDropCompletedRef.current = true;
                     let nextInsertionIndex = index;
                     if (isMlp12TutorialActive && type === 'linear' && linearNodeCount >= 1) {
                       nextInsertionIndex = Math.max(0, linearNodeCount - 1);
                     }
+                    if (isCnn12TutorialActive && type === 'cnn' && cnnNodeCount >= 4) {
+                      const firstLinearIndex = nodes.findIndex((node) => node.type === 'linear');
+                      nextInsertionIndex = firstLinearIndex >= 0 ? firstLinearIndex : nodes.length;
+                    }
                     handleDropBlock(type, nextInsertionIndex);
                     setDraggingBlock(null);
                   }}
+                  reserveBottomActionSpace={isBottomActionVisible}
                 />
                 {activeWorkspace !== 'competition' ? (
                   <TrainingLiveOverlay
@@ -2891,10 +3514,16 @@ export function BuilderShell() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeWorkspace === 'tutorial' && selectedTutorialLessonId === 'mlp-1-2') {
+                      const initialCoachStep = getInitialLessonCoachStep(selectedTutorialLessonId);
+                      if (activeWorkspace === 'tutorial' && initialCoachStep) {
                         replaceNodes(getTutorialLessonPresetNodes(selectedTutorialLessonId));
                         applyLessonTrainingDefaults(selectedTutorialLessonId);
-                        setLessonCoachStep('mlp12-intro');
+                        if (selectedTutorialLessonId === 'cnn-1-3') {
+                          setSelectedAugmentations([]);
+                          setAugmentationParams(defaultAugmentationParams);
+                        }
+                        lastDismissedLessonCoachStepRef.current = initialCoachStep;
+                        setLessonCoachStep(initialCoachStep);
                         clearTrainingUiState();
                         return;
                       }
@@ -2964,7 +3593,7 @@ export function BuilderShell() {
         />
       ) : null}
 
-      {(isMlp12TutorialActive || isCnn11TutorialActive) && lessonCoachStep && activeLessonCoachStep ? (
+      {isGuidedLessonActive && lessonCoachStep && activeLessonCoachStep ? (
         <TutorialCoachOverlay
           open
           stepKey={lessonCoachStep}
@@ -2993,6 +3622,19 @@ export function BuilderShell() {
               setLessonCoachStep('mlp12-retrain');
               return;
             }
+            if (lessonCoachStep === 'cnn12-match-head-input') {
+              if (cnnHeadInputValue !== '6272') {
+                return;
+              }
+              lastDismissedLessonCoachStepRef.current = 'cnn12-retrain';
+              setLessonCoachStep('cnn12-retrain');
+              return;
+            }
+            if (lessonCoachStep === 'cnn13-tune-mixup') {
+              lastDismissedLessonCoachStepRef.current = 'cnn13-select-cutmix';
+              setLessonCoachStep('cnn13-select-cutmix');
+              return;
+            }
             if (lessonCoachStep === 'cnn11-linear-limit') {
               clearTrainingUiState();
               resetBoard();
@@ -3013,6 +3655,18 @@ export function BuilderShell() {
               setIsMnistMissionMinimized(false);
               return;
             }
+            if (lessonCoachStep === 'cnn13-success') {
+              setLessonCoachStep(null);
+              setTutorialStep('play-mission');
+              setIsMnistMissionMinimized(false);
+              return;
+            }
+            if (lessonCoachStep === 'cnn12-success') {
+              setLessonCoachStep(null);
+              setTutorialStep('play-mission');
+              setIsMnistMissionMinimized(false);
+              return;
+            }
             lastDismissedLessonCoachStepRef.current = lessonCoachStep;
             setLessonCoachStep(null);
           }}
@@ -3023,10 +3677,10 @@ export function BuilderShell() {
         />
       ) : null}
 
-      {isMlp12TutorialActive && !lessonCoachStep ? (
+      {(isMlp12TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive) && !lessonCoachStep ? (
         <button
           type="button"
-          onClick={reopenMlp12Guide}
+          onClick={reopenLessonGuide}
           className="fixed bottom-28 right-5 z-[84] rounded-full border border-[#cfe0ff] bg-white/94 px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-primary shadow-[0_14px_28px_rgba(17,81,255,0.12)] backdrop-blur transition hover:bg-white"
         >
           Open Guide
@@ -3162,7 +3816,7 @@ export function BuilderShell() {
       mnistQuestPhase &&
       !(mnistQuestPhase !== 'intro' && isMnistMissionMinimized) ? (
         <MnistElevatorMission
-          variant={isCnn11TutorialActive ? 'laundry' : 'elevator'}
+          variant={isCnn13TutorialActive ? 'album' : isCnn11TutorialActive || isCnn12TutorialActive ? 'laundry' : 'elevator'}
           dataset={selectedDataset}
           phase={mnistQuestPhase}
           trainingStatus={trainingStatus ?? (latestTrainingResult as TrainingJobStatus | null)}
@@ -3173,13 +3827,18 @@ export function BuilderShell() {
             setCnn11MissionRetryPending(false);
           }}
           onMissionFail={(summary) => {
-            if (!isCnn11TutorialActive) {
+            if (!isCnn11TutorialActive && !isCnn12TutorialActive && !isCnn13TutorialActive) {
               return;
             }
-            setCnn11MissionRetryPending(true);
-            lastDismissedLessonCoachStepRef.current = 'cnn11-linear-limit';
+            setCnn11MissionRetryPending(isCnn11TutorialActive);
+            const retryStep = isCnn13TutorialActive
+              ? 'cnn13-select-mixup'
+              : isCnn12TutorialActive
+                ? resolveCurrentCnn12GuideStep()
+                : 'cnn11-linear-limit';
+            lastDismissedLessonCoachStepRef.current = retryStep;
             setTutorialStep('build-model');
-            setLessonCoachStep('cnn11-linear-limit');
+            setLessonCoachStep(retryStep);
             setIsMnistMissionMinimized(false);
           }}
           onMinimize={() => setIsMnistMissionMinimized(true)}
@@ -3192,12 +3851,21 @@ export function BuilderShell() {
               lastDismissedLessonCoachStepRef.current = 'cnn11-stack-linear';
               setLessonCoachStep('cnn11-stack-linear');
             }
+            if (isCnn12TutorialActive) {
+              lastDismissedLessonCoachStepRef.current = 'cnn11-upgrade-cnn';
+              setLessonCoachStep('cnn11-upgrade-cnn');
+            }
+            if (isCnn13TutorialActive) {
+              lastDismissedLessonCoachStepRef.current = 'cnn11-upgrade-cnn';
+              setLessonCoachStep('cnn11-upgrade-cnn');
+            }
           }}
         />
       ) : null}
 
       {isStoryTutorialActive &&
-      (mnistQuestPhase || (isCnn11TutorialActive && tutorialStep === 'build-model')) &&
+      (mnistQuestPhase ||
+        ((isCnn11TutorialActive || isCnn12TutorialActive || isCnn13TutorialActive) && tutorialStep === 'build-model')) &&
       tutorialStep !== 'complete' ? (
         <button
           type="button"

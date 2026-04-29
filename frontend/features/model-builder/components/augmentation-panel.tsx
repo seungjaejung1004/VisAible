@@ -28,7 +28,10 @@ export function AugmentationPanel({
     augmentationGroups.find((group) => group.id === activeGroupId) ?? augmentationGroups[0];
 
   return (
-    <section className="mb-2.5 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-[#f8fbff] shadow-[0_16px_36px_rgba(15,23,42,0.06)] [font-family:var(--font-inter)]">
+    <section
+      className="mb-2.5 overflow-hidden rounded-[28px] border border-[#dbe5f1] bg-[#f8fbff] shadow-[0_16px_36px_rgba(15,23,42,0.06)] [font-family:var(--font-inter)]"
+      data-tutorial-target="tutorial-augmentation-panel"
+    >
       <div className="px-5 py-4">
         <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {augmentationGroups.map((group) => {
@@ -42,6 +45,7 @@ export function AugmentationPanel({
                 key={group.id}
                 type="button"
                 onClick={() => setActiveGroupId(group.id)}
+                data-tutorial-target={`tutorial-augmentation-group-${group.id}`}
                 className={[
                   'relative isolate rounded-[20px] px-4 py-3 text-left transition-all',
                   active
@@ -91,6 +95,7 @@ export function AugmentationPanel({
                     key={option.id}
                     role="button"
                     tabIndex={0}
+                    data-tutorial-target={`tutorial-augmentation-${option.id}`}
                     onClick={() => {
                       if (!active) {
                         onToggle(option.id);
@@ -171,6 +176,7 @@ export function AugmentationPanel({
                           max={parameterConfig.max}
                           value={parameterValue}
                           onChange={(event) => onChangeParam(option.id, Number(event.target.value))}
+                          data-tutorial-target={`tutorial-augmentation-${option.id}-strength`}
                           className="mt-2 h-1.5 w-full accent-primary"
                         />
                       </div>
