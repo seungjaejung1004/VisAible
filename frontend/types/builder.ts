@@ -186,6 +186,8 @@ export type CompetitionRoomSession = {
   isActive: boolean;
   participants: CompetitionParticipant[];
   generatedPassword?: string | null;
+  dailySubmissionCount: number;
+  dailySubmissionLimit: number;
 };
 
 export type CompetitionLeaderboardEntry = {
@@ -193,6 +195,9 @@ export type CompetitionLeaderboardEntry = {
   participantName: string;
   role: 'host' | 'member';
   rank: number;
+  publicRank: number | null;
+  privateRank: number | null;
+  rankChange: number | null;
   publicScore: number;
   privateScore: number | null;
   trainAccuracy: number;
@@ -211,6 +216,7 @@ export type CompetitionLeaderboard = {
   startsAt?: string | null;
   endsAt?: string | null;
   isActive: boolean;
+  scoreMode: 'public' | 'private';
   entries: CompetitionLeaderboardEntry[];
 };
 
@@ -225,6 +231,20 @@ export type CompetitionSubmissionResult = {
   publicScore: number;
   privateScore: number | null;
   submittedAt: string;
+};
+
+export type CompetitionSubmissionHistoryEntry = CompetitionSubmissionResult & {
+  jobId: string;
+  optimizer: string;
+  batchSize: number;
+};
+
+export type CompetitionSubmissionHistory = {
+  roomCode: string;
+  participantId: number;
+  dailySubmissionCount: number;
+  dailySubmissionLimit: number;
+  submissions: CompetitionSubmissionHistoryEntry[];
 };
 
 export type StockPreset = {

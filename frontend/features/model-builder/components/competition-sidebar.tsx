@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Icon } from '@/features/model-builder/components/icons';
 import { Inspector } from '@/features/model-builder/components/inspector';
 import type {
+  CompetitionLeaderboard,
   CompetitionRoomSession,
   CompetitionSubmissionResult,
   TrainingJobStatus,
@@ -27,6 +28,7 @@ type CompetitionSidebarProps = {
     validationLoss: number[];
     validationAccuracy: number[];
   };
+  leaderboard: CompetitionLeaderboard | null;
   runs: CompetitionRunRecord[];
   selectedRunJobId: string | null;
   submitBusy: boolean;
@@ -46,10 +48,15 @@ function formatCompetitionRoleLabel(role: CompetitionRoomSession['participantRol
   return role === 'host' ? '호스트' : '참가자';
 }
 
+function hasCompetitionEnded(room: CompetitionRoomSession) {
+  return room.endsAt ? new Date(room.endsAt).getTime() < Date.now() : false;
+}
+
 export function CompetitionSidebar({
   room,
   trainingStatus,
   liveHistory,
+  leaderboard,
   runs,
   selectedRunJobId,
   submitBusy,
@@ -60,6 +67,11 @@ export function CompetitionSidebar({
   const submittedRuns = runs.filter((run) => run.submitted);
   const selectedRun = submittedRuns.find((run) => run.jobId === selectedRunJobId) ?? null;
   const isHost = room.participantRole === 'host';
+  const displayPrivateScore = hasCompetitionEnded(room);
+  const remainingSubmissions = Math.max(0, room.dailySubmissionLimit - room.dailySubmissionCount);
+  const finalOwnEntry = displayPrivateScore
+    ? leaderboard?.entries.find((entry) => entry.participantId === room.participantId) ?? null
+    : null;
   const selectedRunIndex = selectedRun ? runs.findIndex((run) => run.jobId === selectedRun.jobId) : -1;
   const selectedRunLabel =
     selectedRunIndex >= 0 ? `제출 ${runs.length - selectedRunIndex}` : '선택한 제출 없음';
@@ -187,7 +199,10 @@ export function CompetitionSidebar({
                 제출 현황
               </div>
               <div className="mt-1.5 font-display text-[16px] font-bold text-[#0f766e]">
-                {`${submittedRuns.length}/${runs.length}`}
+                {`${room.dailySubmissionCount}/${room.dailySubmissionLimit}`}
+              </div>
+              <div className="mt-1 text-[10px] font-bold text-[#71839d]">
+                하루 기준
               </div>
             </div>
           </div>
@@ -215,7 +230,7 @@ export function CompetitionSidebar({
                   </div>
                   <div className="inline-flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#0f766e]">
                     <Icon name="check" className="h-3.5 w-3.5" />
-                    {isHost ? '공개 + 비공개' : '제출 완료'}
+                    {displayPrivateScore ? '최종 점수 공개' : '제출 완료'}
                   </div>
                 </div>
 
@@ -246,11 +261,11 @@ export function CompetitionSidebar({
                   </div>
                   <div className="rounded-[14px] bg-[#f4f7fc] px-3 py-3">
                     <div className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#7b8da8]">
-                      {isHost ? 'Private' : '상태'}
+                      {displayPrivateScore ? 'Private' : '상태'}
                     </div>
                     <div className="mt-1 font-display text-[17px] font-bold text-[#10213b]">
-                      {isHost
-                        ? formatPercent(selectedRun.submission?.privateScore)
+                      {displayPrivateScore
+                        ? formatPercent(selectedRun.submission?.privateScore ?? finalOwnEntry?.privateScore)
                         : selectedRun.submitted
                           ? '제출 완료'
                           : '대기 중'}
@@ -332,7 +347,7 @@ export function CompetitionSidebar({
                       </div>
                     </div>
 
-                    <div className={`mt-3 grid gap-2 ${isHost ? '2xl:grid-cols-3' : 'grid-cols-2'}`}>
+                    <div className={`mt-3 grid gap-2 ${displayPrivateScore ? '2xl:grid-cols-3' : 'grid-cols-2'}`}>
                       <div className="rounded-[13px] border border-[#e4edf7] bg-[#f8fbff] px-3 py-2.5">
                         <div className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#7b8da8]">
                           Val
@@ -349,13 +364,13 @@ export function CompetitionSidebar({
                           {formatPercent(run.submission?.publicScore)}
                         </div>
                       </div>
-                      {isHost ? (
+                      {displayPrivateScore ? (
                         <div className="rounded-[13px] border border-[#e4edf7] bg-[#f8fbff] px-3 py-2.5">
                           <div className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#7b8da8]">
                             Private
                           </div>
                           <div className="mt-1 font-display text-[15px] font-bold text-[#10213b]">
-                            {formatPercent(run.submission?.privateScore)}
+                            {formatPercent(run.submission?.privateScore ?? finalOwnEntry?.privateScore)}
                           </div>
                         </div>
                       ) : null}
@@ -378,10 +393,10 @@ export function CompetitionSidebar({
                             event.stopPropagation();
                             onSubmitRun(run.jobId);
                           }}
-                          disabled={submitBusy}
+                          disabled={submitBusy || remainingSubmissions === 0}
                           className="rounded-[12px] bg-[#10213b] px-3 py-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-white shadow-[0_10px_22px_rgba(15,23,42,0.16)] disabled:opacity-50"
                         >
-                          {submitBusy ? '제출 중...' : '제출하기'}
+                          {submitBusy ? '제출 중...' : remainingSubmissions === 0 ? '오늘 마감' : '제출하기'}
                         </button>
                       )}
                     </div>

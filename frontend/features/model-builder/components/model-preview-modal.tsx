@@ -1237,7 +1237,7 @@ export function ModelPreviewModal({
             <button
               type="button"
               onClick={onClose}
-              className="grid h-10 w-10 place-items-center rounded-full border border-[#ffd6df] bg-[#fff2f5] text-[#d34b6b] shadow-[0_8px_18px_rgba(211,75,107,0.12)] transition-colors hover:bg-[#ffe4ea] hover:text-[#b82f52]"
+              className="ui-modal-close-button"
               aria-label="Close preview"
             >
               <Icon name="close" className="h-5.5 w-5.5" />

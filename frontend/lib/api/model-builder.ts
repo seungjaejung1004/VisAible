@@ -3,6 +3,7 @@ import type {
   CanvasNode,
   CompetitionLeaderboard,
   CompetitionRoomSession,
+  CompetitionSubmissionHistory,
   CompetitionSubmissionResult,
   TrainingAugmentationId,
   TrainingAugmentationParams,
@@ -80,6 +81,12 @@ export async function getCompetitionRoom(roomCode: string, participantId?: numbe
 
 export async function getCompetitionLeaderboard(roomCode: string, participantId?: number) {
   return apiClient<CompetitionLeaderboard>(`/competition/rooms/${roomCode}/leaderboard`, {
+    query: { participant_id: participantId },
+  });
+}
+
+export async function getCompetitionSubmissionHistory(roomCode: string, participantId: number) {
+  return apiClient<CompetitionSubmissionHistory>(`/competition/rooms/${roomCode}/submissions`, {
     query: { participant_id: participantId },
   });
 }

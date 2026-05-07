@@ -867,7 +867,6 @@ export function Canvas({
   const stackRef = useRef<HTMLDivElement>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
-  const [trashHover, setTrashHover] = useState(false);
   const { dimensions: nodeDimensions, advice: nodeAdvice } = analyzeModelNodes(selectedDataset, nodes);
   const totalParameterCount = useMemo(
     () => estimateTotalParameterCount(selectedDataset, nodes),
@@ -881,7 +880,6 @@ export function Canvas({
     dropout: '학습 중 일부 값을 쉬게 해서 과적합을 줄여주는 레이어예요.',
   };
   const canRemoveNode = (node: CanvasNode) => isNodeRemovable?.(node) ?? true;
-  const removableNodeCount = nodes.filter(canRemoveNode).length;
   const draggingNode = nodes.find((node) => node.id === draggingNodeId) ?? null;
   const draggingNodeRemovable = draggingNode ? canRemoveNode(draggingNode) : false;
 
@@ -910,9 +908,6 @@ export function Canvas({
             return;
           }
 
-          if (draggedNodeId) {
-            setTrashHover(false);
-          }
           setHoverIndex(getInsertionIndex(event, stackRef.current, nodes.length));
         }}
         onDragLeave={(event) => {
@@ -930,7 +925,6 @@ export function Canvas({
           if (draggedNodeId) {
             setHoverIndex(null);
             setDraggingNodeId(null);
-            setTrashHover(false);
             onMoveNode(draggedNodeId, insertionIndex);
             return;
           }
@@ -940,7 +934,6 @@ export function Canvas({
           }
 
           setHoverIndex(null);
-          setTrashHover(false);
           onDropBlock(droppedBlock, insertionIndex);
         }}
         className={[
@@ -1043,7 +1036,6 @@ export function Canvas({
 
                       event.preventDefault();
                       event.stopPropagation();
-                      setTrashHover(false);
                       setHoverIndex(getCardInsertionIndex(event, index));
                     }}
                     onDrop={(event) => {
@@ -1056,7 +1048,6 @@ export function Canvas({
                       event.stopPropagation();
                       const insertionIndex = getCardInsertionIndex(event, index);
                       setDraggingNodeId(null);
-                      setTrashHover(false);
                       setHoverIndex(null);
                       onMoveNode(draggedNodeId, insertionIndex);
                     }}
@@ -1131,12 +1122,10 @@ export function Canvas({
                         event.dataTransfer.setData('application/x-builder-node', node.id);
                         event.dataTransfer.setDragImage(event.currentTarget, 72, 24);
                         setDraggingNodeId(node.id);
-                        setTrashHover(false);
                       }}
                       onDragEnd={() => {
                         setDraggingNodeId(null);
                         setHoverIndex(null);
-                        setTrashHover(false);
                       }}
                     />
                       );
@@ -1173,58 +1162,10 @@ export function Canvas({
             <div className="pointer-events-none absolute inset-x-5 bottom-5 rounded-2xl border border-dashed border-primary/40 bg-white/88 px-4 py-3 text-center text-[14px] font-semibold text-primary shadow-[0_18px_40px_rgba(17,81,255,0.08)] backdrop-blur-md">
               {draggingNodeId
                 ? draggingNodeRemovable
-                  ? '블록을 원하는 위치로 옮기거나, 아래 휴지통에 놓아 삭제할 수 있어요.'
+                  ? '블록을 원하는 위치로 옮겨 다시 정렬할 수 있어요.'
                   : '이 레슨에서는 모델 구조를 지우지 않고, 위치만 다시 정렬할 수 있어요.'
                 : `${draggingBlock === 'linear' ? '선형 레이어' : draggingBlock === 'cnn' ? 'CNN 레이어' : draggingBlock === 'pooling' ? '풀링 레이어' : '드롭아웃 레이어'}를 스택 위로 끌어와 추가해보세요.`}
             </div>
-            {draggingNodeId && removableNodeCount > 0 ? (
-              <div
-                onDragOver={(event) => {
-                  if (!getDraggedNodeId(event) || !draggingNodeRemovable) {
-                    return;
-                  }
-
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setTrashHover(true);
-                  setHoverIndex(null);
-                }}
-                onDragLeave={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                    setTrashHover(false);
-                  }
-                }}
-                onDrop={(event) => {
-                  const droppedNodeId = getDraggedNodeId(event);
-                  if (!droppedNodeId || !draggingNodeRemovable) {
-                    return;
-                  }
-
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setTrashHover(false);
-                  setDraggingNodeId(null);
-                  setHoverIndex(null);
-                  onRemoveNode(droppedNodeId);
-                }}
-                className={[
-                  'fixed bottom-6 left-1/2 z-[160] flex min-w-[320px] -translate-x-1/2 items-center justify-center gap-3 rounded-[22px] border px-6 py-4 text-[15px] font-bold shadow-[0_30px_72px_rgba(13,27,51,0.3)] transition-all duration-150',
-                  trashHover
-                    ? 'border-[#ef4444] bg-[#fff1f2] text-[#b91c1c] ring-4 ring-[#fecdd3] scale-[1.08]'
-                    : 'border-[#fbcfe8] bg-white text-[#c2416d] ring-1 ring-[rgba(244,114,182,0.18)] backdrop-blur-md',
-                ].join(' ')}
-              >
-                <span className="grid h-11 w-11 place-items-center rounded-full bg-[#fff0f4] text-[22px] leading-none shadow-[inset_0_0_0_1px_rgba(244,114,182,0.18)]">
-                  🗑
-                </span>
-                <div className="grid gap-0.5 text-center">
-                  <span>Drop here to delete</span>
-                  <span className="text-[11px] font-extrabold uppercase tracking-[0.14em] opacity-70">
-                    Trash Zone
-                  </span>
-                </div>
-              </div>
-            ) : null}
           </>
         ) : null}
       </div>

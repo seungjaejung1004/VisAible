@@ -82,6 +82,10 @@
     @apply font-display text-[18px] font-bold tracking-[-0.03em] text-[#10213b];
   }
 
+  .ui-modal-close-button {
+    @apply grid h-10 w-10 place-items-center rounded-full border border-[#ffd6df] bg-[#fff2f5] text-[#c92f55] shadow-[0_8px_18px_rgba(201,47,85,0.12)] transition-colors hover:bg-[#ffe4ea] hover:text-[#9f2445];
+  }
+
   .learning-markdown {
     @apply text-[13px] leading-[1.7] text-[#24405f];
   }

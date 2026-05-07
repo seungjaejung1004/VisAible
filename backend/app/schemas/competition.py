@@ -57,6 +57,8 @@ class CompetitionRoomResponse(BaseModel):
     isActive: bool
     participants: list[CompetitionParticipantResponse]
     generatedPassword: str | None = None
+    dailySubmissionCount: int = 0
+    dailySubmissionLimit: int = 5
 
 
 class CompetitionLeaderboardEntry(BaseModel):
@@ -64,6 +66,9 @@ class CompetitionLeaderboardEntry(BaseModel):
     participantName: str
     role: str
     rank: int
+    publicRank: int | None = None
+    privateRank: int | None = None
+    rankChange: int | None = None
     publicScore: float
     privateScore: float | None = None
     trainAccuracy: float
@@ -82,6 +87,7 @@ class CompetitionLeaderboardResponse(BaseModel):
     startsAt: str | None = None
     endsAt: str | None = None
     isActive: bool
+    scoreMode: str
     entries: list[CompetitionLeaderboardEntry]
 
 
@@ -96,3 +102,17 @@ class CompetitionSubmissionResponse(BaseModel):
     publicScore: float
     privateScore: float | None = None
     submittedAt: str
+
+
+class CompetitionSubmissionHistoryEntry(CompetitionSubmissionResponse):
+    jobId: str
+    optimizer: str
+    batchSize: int
+
+
+class CompetitionSubmissionHistoryResponse(BaseModel):
+    roomCode: str
+    participantId: int
+    dailySubmissionCount: int
+    dailySubmissionLimit: int
+    submissions: list[CompetitionSubmissionHistoryEntry]

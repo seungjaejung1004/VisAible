@@ -922,10 +922,10 @@ function LayerGuideModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-full bg-white text-[#7b8da9] shadow-[0_12px_24px_rgba(13,27,51,0.08)] transition hover:text-[#12213f]"
+          className="ui-modal-close-button absolute right-5 top-5"
           aria-label="설명 닫기"
         >
-          <span className="text-[22px] leading-none">×</span>
+          <span className="text-[26px] leading-none">×</span>
         </button>
 
         <div className="grid gap-6 md:grid-cols-[540px_minmax(0,1fr)] md:gap-8">
@@ -1475,9 +1475,10 @@ function DatasetDetailPanel({
             <button
               type="button"
               onClick={onClose}
-              className={largeSamples ? 'rounded-full border border-[#fecaca] bg-[#fff1f2] px-4 py-2 text-[13px] font-extrabold uppercase tracking-[0.16em] text-[#b42318] shadow-[0_8px_18px_rgba(180,35,24,0.16)] transition hover:bg-[#ffe4e6]' : 'rounded-full border border-[#fecaca] bg-[#fff1f2] px-3.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#b42318] shadow-[0_8px_18px_rgba(180,35,24,0.16)] transition hover:bg-[#ffe4e6]'}
+              className="ui-modal-close-button"
+              aria-label="데이터셋 상세 닫기"
             >
-              Close
+              <span className="text-[26px] leading-none">×</span>
             </button>
           ) : null}
         </div>

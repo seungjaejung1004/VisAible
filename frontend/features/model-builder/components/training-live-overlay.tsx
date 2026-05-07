@@ -560,7 +560,7 @@ export function TrainingLiveOverlay({ dataset, nodes, trainingStatus, isAvailabl
             <button
               type="button"
               onClick={onClose}
-              className="grid h-11 w-11 place-items-center rounded-full bg-white/92 text-[24px] leading-none text-[#7b8da9] shadow-[0_14px_30px_rgba(13,27,51,0.08)] transition-colors hover:text-[#12213f]"
+              className="ui-modal-close-button"
               aria-label="Close live training view"
             >
               ×

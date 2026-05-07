@@ -205,10 +205,10 @@ function FeatureMapGuideModal({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-full bg-white text-[#7b8da9] shadow-[0_12px_24px_rgba(13,27,51,0.08)] transition hover:text-[#12213f]"
+          className="ui-modal-close-button absolute right-5 top-5"
           aria-label="설명 닫기"
         >
-          <span className="text-[22px] leading-none">×</span>
+          <span className="text-[26px] leading-none">×</span>
         </button>
 
         <div className="grid gap-6 md:grid-cols-[420px_minmax(0,1fr)] md:gap-8">

@@ -5,7 +5,6 @@ import type { CompetitionLeaderboard } from '@/types/builder';
 type CompetitionRankModalProps = {
   roomTitle: string;
   leaderboard: CompetitionLeaderboard | null;
-  isHost: boolean;
   onClose: () => void;
 };
 
@@ -17,14 +16,36 @@ function formatPercent(value: number | null | undefined) {
   return `${Math.round(value * 10000) / 100}%`;
 }
 
+function formatRankChange(value: number | null | undefined) {
+  if (value == null) {
+    return '-';
+  }
+  if (value > 0) {
+    return `▲ ${value}`;
+  }
+  if (value < 0) {
+    return `▼ ${Math.abs(value)}`;
+  }
+  return '0';
+}
+
 export function CompetitionRankModal({
   roomTitle,
   leaderboard,
-  isHost,
   onClose,
 }: CompetitionRankModalProps) {
   const entryCount = leaderboard?.entries.length ?? 0;
-  const bestScore = entryCount > 0 ? leaderboard?.entries[0]?.publicScore ?? null : null;
+  const scoreMode = leaderboard?.scoreMode ?? 'public';
+  const isFinalMode = scoreMode === 'private';
+  const bestScore =
+    entryCount > 0
+      ? isFinalMode
+        ? leaderboard?.entries[0]?.privateScore ?? null
+        : leaderboard?.entries[0]?.publicScore ?? null
+      : null;
+  const gridClassName = isFinalMode
+    ? 'grid-cols-[72px_84px_minmax(180px,1.2fr)_repeat(5,minmax(0,1fr))]'
+    : 'grid-cols-[72px_minmax(180px,1.4fr)_repeat(4,minmax(0,1fr))]';
 
   return (
     <div className="fixed inset-0 z-[120] bg-[rgba(15,23,42,0.5)] px-5 py-8 backdrop-blur-sm">
@@ -39,15 +60,15 @@ export function CompetitionRankModal({
                 {roomTitle}
               </div>
               <div className="mt-2 text-[13px] font-semibold text-[#66768f]">
-                {isHost
-                  ? '\uD638\uC2A4\uD2B8 \uD654\uBA74\uC5D0\uC11C\uB294 \uC228\uACA8\uC9C4 Private Score\uAE4C\uC9C0 \uD568\uAED8 \uD655\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.'
-                  : '\uCC38\uAC00\uC790 \uD654\uBA74\uC5D0\uC11C\uB294 Public Score\uB9CC \uD45C\uC2DC\uB429\uB2C8\uB2E4.'}
+                {isFinalMode
+                  ? '대회가 종료되어 Private Score 기준 최종 순위와 Public 순위 대비 변동을 표시합니다.'
+                  : '대회 진행 중에는 Public Score 기준 순위만 표시합니다.'}
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="grid h-10 w-10 place-items-center rounded-full border border-[#dbe5f1] bg-[#f8fbff] text-[20px] font-bold text-[#5f6f86] transition hover:text-[#10213b]"
+              className="ui-modal-close-button"
               aria-label="\uB7AD\uD0B9 \uBAA8\uB2EC \uB2EB\uAE30"
             >
               ×
@@ -63,7 +84,7 @@ export function CompetitionRankModal({
             </div>
             <div className="rounded-[18px] border border-[#dbe5f1] bg-[#f8fbff] px-4 py-4">
               <div className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#7b8da8]">
-                Best Public Score
+                {isFinalMode ? 'Best Private Score' : 'Best Public Score'}
               </div>
               <div className="mt-2 font-display text-[22px] font-bold text-[#2563eb]">
                 {formatPercent(bestScore)}
@@ -74,7 +95,7 @@ export function CompetitionRankModal({
                 Visibility
               </div>
               <div className="mt-2 font-display text-[22px] font-bold text-[#10213b]">
-                {isHost ? 'Public + Private' : 'Public Only'}
+                {isFinalMode ? 'Final Private' : 'Public Only'}
               </div>
             </div>
           </div>
@@ -84,12 +105,13 @@ export function CompetitionRankModal({
           {entryCount > 0 ? (
             <div className="overflow-hidden rounded-[24px] border border-[#dbe5f1] bg-white shadow-[0_16px_36px_rgba(15,23,42,0.06)]">
               <div
-                className={`grid gap-3 border-b border-[#e7eef7] bg-[#f8fbff] px-5 py-4 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#71839d] ${isHost ? 'grid-cols-[72px_minmax(180px,1.2fr)_repeat(5,minmax(0,1fr))]' : 'grid-cols-[72px_minmax(180px,1.4fr)_repeat(4,minmax(0,1fr))]'}`}
+                className={`grid gap-3 border-b border-[#e7eef7] bg-[#f8fbff] px-5 py-4 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#71839d] ${gridClassName}`}
               >
                 <div>Rank</div>
+                {isFinalMode ? <div>Change</div> : null}
                 <div>Team</div>
                 <div>Public</div>
-                {isHost ? <div>Private</div> : null}
+                {isFinalMode ? <div>Private</div> : null}
                 <div>Validation</div>
                 <div>Train</div>
                 <div>Status</div>
@@ -101,9 +123,7 @@ export function CompetitionRankModal({
                     key={`${entry.participantId}-${entry.submittedAt}`}
                     className={[
                       'grid gap-3 px-5 py-4 text-[14px] text-[#24364f]',
-                      isHost
-                        ? 'grid-cols-[72px_minmax(180px,1.2fr)_repeat(5,minmax(0,1fr))]'
-                        : 'grid-cols-[72px_minmax(180px,1.4fr)_repeat(4,minmax(0,1fr))]',
+                      gridClassName,
                       index !== entryCount - 1 ? 'border-b border-[#eef3f8]' : '',
                     ].join(' ')}
                   >
@@ -112,18 +132,34 @@ export function CompetitionRankModal({
                         {entry.rank}
                       </div>
                     </div>
+                    {isFinalMode ? (
+                      <div
+                        className={[
+                          'flex items-center font-display text-[16px] font-bold',
+                          (entry.rankChange ?? 0) > 0
+                            ? 'text-[#0f766e]'
+                            : (entry.rankChange ?? 0) < 0
+                              ? 'text-[#dc2626]'
+                              : 'text-[#71839d]',
+                        ].join(' ')}
+                      >
+                        {formatRankChange(entry.rankChange)}
+                      </div>
+                    ) : null}
                     <div className="min-w-0">
                       <div className="truncate font-display text-[18px] font-bold text-[#10213b]">
                         {entry.participantName}
                       </div>
                       <div className="mt-1 text-[12px] font-semibold text-[#71839d]">
-                        {`${entry.role} · ${new Date(entry.submittedAt).toLocaleString()}`}
+                        {isFinalMode
+                          ? `${entry.role} · Public #${entry.publicRank ?? '-'} · ${new Date(entry.submittedAt).toLocaleString()}`
+                          : `${entry.role} · ${new Date(entry.submittedAt).toLocaleString()}`}
                       </div>
                     </div>
                     <div className="flex items-center font-display text-[18px] font-bold text-[#2563eb]">
                       {formatPercent(entry.publicScore)}
                     </div>
-                    {isHost ? (
+                    {isFinalMode ? (
                       <div className="flex items-center font-display text-[18px] font-bold text-[#10213b]">
                         {formatPercent(entry.privateScore)}
                       </div>

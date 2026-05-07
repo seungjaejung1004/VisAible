@@ -31,6 +31,7 @@ import {
   enterCompetitionRoom,
   getCompetitionLeaderboard,
   getCompetitionRoom,
+  getCompetitionSubmissionHistory,
   getTrainingStatus,
   startTraining,
   stopTraining,
@@ -52,6 +53,7 @@ import type {
   CanvasNode,
   CompetitionLeaderboard,
   CompetitionRoomSession,
+  CompetitionSubmissionHistoryEntry,
   CompetitionSubmissionResult,
   TrainingAugmentationId,
   TrainingChallengeSample,
@@ -139,6 +141,41 @@ type CompetitionRunRecord = {
   submission?: CompetitionSubmissionResult | null;
   completedAt?: string | null;
 };
+
+function submissionHistoryToRun(entry: CompetitionSubmissionHistoryEntry): CompetitionRunRecord {
+  return {
+    jobId: entry.jobId,
+    trainAccuracy: entry.trainAccuracy,
+    validationAccuracy: entry.validationAccuracy,
+    submitted: true,
+    submission: {
+      submissionId: entry.submissionId,
+      roomCode: entry.roomCode,
+      participantId: entry.participantId,
+      participantName: entry.participantName,
+      isBaseline: entry.isBaseline,
+      trainAccuracy: entry.trainAccuracy,
+      validationAccuracy: entry.validationAccuracy,
+      publicScore: entry.publicScore,
+      privateScore: entry.privateScore,
+      submittedAt: entry.submittedAt,
+    },
+    completedAt: entry.submittedAt,
+  };
+}
+
+function mergeCompetitionSubmissionHistory(
+  currentRuns: CompetitionRunRecord[],
+  history: CompetitionSubmissionHistoryEntry[],
+) {
+  const historyRuns = history.map(submissionHistoryToRun);
+  const historyJobIds = new Set(historyRuns.map((run) => run.jobId));
+  const localUnsubmittedRuns = currentRuns.filter(
+    (run) => !run.submitted && !historyJobIds.has(run.jobId),
+  );
+
+  return [...localUnsubmittedRuns, ...historyRuns];
+}
 
 type DatasetTeachingConfig = {
   allowedBlocks: BlockType[];
@@ -2483,9 +2520,10 @@ export function BuilderShell() {
 
     void (async () => {
       try {
-        const [room, leaderboard] = await Promise.all([
+        const [room, leaderboard, submissionHistory] = await Promise.all([
           getCompetitionRoom(competitionRoom.roomCode, competitionRoom.participantId),
           getCompetitionLeaderboard(competitionRoom.roomCode, competitionRoom.participantId),
+          getCompetitionSubmissionHistory(competitionRoom.roomCode, competitionRoom.participantId),
         ]);
         setCompetitionRoom((current) =>
           current == null
@@ -2498,13 +2536,19 @@ export function BuilderShell() {
               },
         );
         setCompetitionLeaderboard(leaderboard);
+        setCompetitionRuns((current) =>
+          mergeCompetitionSubmissionHistory(current, submissionHistory.submissions),
+        );
+        setSelectedCompetitionRunJobId((current) =>
+          current ?? submissionHistory.submissions[0]?.jobId ?? null,
+        );
       } catch (error) {
         setCompetitionError(
           error instanceof Error ? error.message : 'Competition room sync failed unexpectedly',
         );
       }
     })();
-  }, [competitionRoom?.roomCode, competitionRoom?.participantId]);
+  }, [competitionRoom?.roomCode, competitionRoom?.participantId, currentTime]);
 
   useEffect(() => {
     if (!hasLiveTrainingVisualization && isTrainingOverlayOpen) {
@@ -2557,11 +2601,15 @@ export function BuilderShell() {
     try {
       const room = await createCompetitionRoom(payload);
       setCompetitionRoom(room);
-      setCompetitionLeaderboard(await getCompetitionLeaderboard(room.roomCode, room.participantId));
+      const [leaderboard, submissionHistory] = await Promise.all([
+        getCompetitionLeaderboard(room.roomCode, room.participantId),
+        getCompetitionSubmissionHistory(room.roomCode, room.participantId),
+      ]);
+      setCompetitionLeaderboard(leaderboard);
       setActiveWorkspace('competition');
       setBatchSize(128);
-      setCompetitionRuns([]);
-      setSelectedCompetitionRunJobId(null);
+      setCompetitionRuns(mergeCompetitionSubmissionHistory([], submissionHistory.submissions));
+      setSelectedCompetitionRunJobId(submissionHistory.submissions[0]?.jobId ?? null);
     } catch (error) {
       setCompetitionError(
         error instanceof Error ? error.message : 'Competition room creation failed unexpectedly',
@@ -2584,11 +2632,15 @@ export function BuilderShell() {
         ...room,
         generatedPassword: room.participantRole === 'host' ? payload.password : null,
       });
-      setCompetitionLeaderboard(await getCompetitionLeaderboard(room.roomCode, room.participantId));
+      const [leaderboard, submissionHistory] = await Promise.all([
+        getCompetitionLeaderboard(room.roomCode, room.participantId),
+        getCompetitionSubmissionHistory(room.roomCode, room.participantId),
+      ]);
+      setCompetitionLeaderboard(leaderboard);
       setActiveWorkspace('competition');
       setBatchSize(128);
-      setCompetitionRuns([]);
-      setSelectedCompetitionRunJobId(null);
+      setCompetitionRuns(mergeCompetitionSubmissionHistory([], submissionHistory.submissions));
+      setSelectedCompetitionRunJobId(submissionHistory.submissions[0]?.jobId ?? null);
     } catch (error) {
       setCompetitionError(
         error instanceof Error ? error.message : 'Competition room entry failed unexpectedly',
@@ -2620,9 +2672,26 @@ export function BuilderShell() {
             : run,
         ),
       );
-      setCompetitionLeaderboard(
-        await getCompetitionLeaderboard(competitionRoom.roomCode, competitionRoom.participantId),
+      const [room, leaderboard, submissionHistory] = await Promise.all([
+        getCompetitionRoom(competitionRoom.roomCode, competitionRoom.participantId),
+        getCompetitionLeaderboard(competitionRoom.roomCode, competitionRoom.participantId),
+        getCompetitionSubmissionHistory(competitionRoom.roomCode, competitionRoom.participantId),
+      ]);
+      setCompetitionRoom((current) =>
+        current == null
+          ? room
+          : {
+              ...room,
+              generatedPassword:
+                room.generatedPassword ??
+                (current.participantRole === 'host' ? current.generatedPassword : null),
+            },
       );
+      setCompetitionLeaderboard(leaderboard);
+      setCompetitionRuns((current) =>
+        mergeCompetitionSubmissionHistory(current, submissionHistory.submissions),
+      );
+      setSelectedCompetitionRunJobId((current) => current ?? jobId);
       setIsCompetitionRankOpen(true);
     } catch (error) {
       setCompetitionError(
@@ -2898,9 +2967,6 @@ export function BuilderShell() {
   };
 
   const handlePreviewOpen = () => {
-    if (activeWorkspace === 'competition') {
-      return;
-    }
     setIsPreviewOpen(true);
   };
 
@@ -3388,6 +3454,7 @@ export function BuilderShell() {
                     room={competitionRoom}
                     trainingStatus={trainingStatus ?? (latestTrainingResult as TrainingJobStatus | null)}
                     liveHistory={liveHistory}
+                    leaderboard={competitionLeaderboard}
                     runs={competitionRuns}
                     selectedRunJobId={selectedCompetitionRunJobId}
                     submitBusy={competitionSubmitBusy}
@@ -3703,7 +3770,6 @@ export function BuilderShell() {
         <CompetitionRankModal
           roomTitle={competitionRoom.title}
           leaderboard={competitionLeaderboard}
-          isHost={competitionRoom.participantRole === 'host'}
           onClose={() => setIsCompetitionRankOpen(false)}
         />
       ) : null}

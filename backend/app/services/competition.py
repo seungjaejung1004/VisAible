@@ -15,6 +15,7 @@ from app.schemas.competition import (
     CompetitionLeaderboardResponse,
     CompetitionParticipantResponse,
     CompetitionRoomResponse,
+    CompetitionSubmissionHistoryResponse,
     CompetitionSubmissionResponse,
     CompetitionSubmitRequest,
 )
@@ -57,6 +58,7 @@ PRIVATE_EVAL_CONFIG = {
     "flowers102": 4,
 }
 EVAL_BATCH_SIZE = 64
+DAILY_SUBMISSION_LIMIT = 5
 KST = timezone(timedelta(hours=9))
 
 
@@ -128,6 +130,28 @@ def _now_iso() -> str:
     return datetime.now(KST).isoformat()
 
 
+def _current_kst_date() -> str:
+    return datetime.now(KST).date().isoformat()
+
+
+def _daily_submission_count(
+    connection: sqlite3.Connection,
+    room_id: int,
+    participant_id: int,
+) -> int:
+    row = connection.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM competition_submissions
+        WHERE room_id = ?
+          AND participant_id = ?
+          AND substr(submitted_at, 1, 10) = ?
+        """,
+        (room_id, participant_id, _current_kst_date()),
+    ).fetchone()
+    return int(row["count"]) if row is not None else 0
+
+
 def _parse_kst_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
@@ -168,6 +192,12 @@ def _room_status(starts_at: str | None, ends_at: str | None) -> bool:
         if end < now:
             return False
     return True
+
+
+def _room_has_ended(ends_at: str | None) -> bool:
+    if not ends_at:
+        return False
+    return _parse_kst_datetime(ends_at) < datetime.now(KST)
 
 
 def _ensure_room_schedule_is_valid(starts_at: str | None, ends_at: str | None) -> None:
@@ -284,6 +314,8 @@ def create_competition_room(payload: CompetitionCreateRequest) -> CompetitionRoo
             isActive=_room_status(payload.startsAt, payload.endsAt),
             participants=participants,
             generatedPassword=password,
+            dailySubmissionCount=_daily_submission_count(connection, room_id, participant_id),
+            dailySubmissionLimit=DAILY_SUBMISSION_LIMIT,
         )
 
 
@@ -352,6 +384,8 @@ def enter_competition_room(payload: CompetitionEnterRequest) -> CompetitionRoomR
             isActive=_room_status(room["starts_at"], room["ends_at"]),
             participants=participants,
             generatedPassword=None,
+            dailySubmissionCount=_daily_submission_count(connection, int(room["id"]), participant_id),
+            dailySubmissionLimit=DAILY_SUBMISSION_LIMIT,
         )
 
 
@@ -382,6 +416,9 @@ def get_competition_room(room_code: str, participant_id: int | None = None) -> C
                 (participant_id, room["id"]),
             ).fetchone()
 
+        response_participant_id = (
+            int(participant["id"]) if participant is not None else int(room["host_participant_id"])
+        )
         participants = _serialize_participants(connection, int(room["id"]))
         return CompetitionRoomResponse(
             roomCode=normalized,
@@ -389,7 +426,7 @@ def get_competition_room(room_code: str, participant_id: int | None = None) -> C
             datasetId=str(room["dataset_id"]),
             hostName=str(room["host_name"]),
             hostParticipantId=int(room["host_participant_id"]),
-            participantId=int(participant["id"]) if participant is not None else int(room["host_participant_id"]),
+            participantId=response_participant_id,
             participantName=str(participant["display_name"]) if participant is not None else str(room["host_name"]),
             participantRole=str(participant["role"]) if participant is not None else "host",
             startsAt=room["starts_at"],
@@ -398,6 +435,8 @@ def get_competition_room(room_code: str, participant_id: int | None = None) -> C
             isActive=_room_status(room["starts_at"], room["ends_at"]),
             participants=participants,
             generatedPassword=None,
+            dailySubmissionCount=_daily_submission_count(connection, int(room["id"]), response_participant_id),
+            dailySubmissionLimit=DAILY_SUBMISSION_LIMIT,
         )
 
 
@@ -587,6 +626,13 @@ def submit_competition_run(payload: CompetitionSubmitRequest) -> CompetitionSubm
         if participant is None:
             raise ValueError("Competition participant was not found in this room")
 
+        submitted_at = _now_iso()
+        submission_count = _daily_submission_count(connection, int(room["id"]), int(participant["id"]))
+        if submission_count >= DAILY_SUBMISSION_LIMIT:
+            raise ValueError(
+                f"오늘 제출 가능 횟수를 모두 사용했습니다. 참가자당 하루 최대 {DAILY_SUBMISSION_LIMIT}회까지 제출할 수 있습니다."
+            )
+
         training_job = get_training_job(payload.jobId)
         if training_job is None or training_job.get("status") != "completed":
             raise ValueError("Completed training job is required before submission")
@@ -608,7 +654,6 @@ def submit_competition_run(payload: CompetitionSubmitRequest) -> CompetitionSubm
         latest_metric = metrics[-1] if metrics else {}
         train_accuracy = round(float(latest_metric.get("trainAccuracy", 0.0)), 4)
         validation_accuracy = round(float(latest_metric.get("validationAccuracy", 0.0)), 4)
-        submitted_at = _now_iso()
 
         existing_baseline = connection.execute(
             """
@@ -652,8 +697,89 @@ def submit_competition_run(payload: CompetitionSubmitRequest) -> CompetitionSubm
             trainAccuracy=train_accuracy,
             validationAccuracy=validation_accuracy,
             publicScore=public_score,
-            privateScore=private_score if str(participant["role"]) == "host" else None,
+            privateScore=None,
             submittedAt=submitted_at,
+        )
+
+
+def get_competition_submission_history(
+    room_code: str,
+    participant_id: int,
+) -> CompetitionSubmissionHistoryResponse:
+    init_competition_db()
+    normalized = _normalize_room_code(room_code)
+
+    with _connect() as connection:
+        room = connection.execute(
+            """
+            SELECT id, room_code, ends_at
+            FROM competition_rooms
+            WHERE room_code = ?
+            """,
+            (normalized,),
+        ).fetchone()
+        if room is None:
+            raise ValueError("Competition room not found")
+
+        participant = connection.execute(
+            """
+            SELECT id, display_name, role
+            FROM competition_participants
+            WHERE id = ? AND room_id = ?
+            """,
+            (participant_id, room["id"]),
+        ).fetchone()
+        if participant is None:
+            raise ValueError("Competition participant was not found in this room")
+
+        has_ended = _room_has_ended(room["ends_at"])
+        rows = connection.execute(
+            """
+            SELECT
+                id,
+                job_id,
+                optimizer,
+                batch_size,
+                train_accuracy,
+                validation_accuracy,
+                public_score,
+                private_score,
+                is_baseline,
+                submitted_at
+            FROM competition_submissions
+            WHERE room_id = ? AND participant_id = ?
+            ORDER BY submitted_at DESC, id DESC
+            """,
+            (room["id"], participant["id"]),
+        ).fetchall()
+
+        return CompetitionSubmissionHistoryResponse(
+            roomCode=normalized,
+            participantId=int(participant["id"]),
+            dailySubmissionCount=_daily_submission_count(
+                connection,
+                int(room["id"]),
+                int(participant["id"]),
+            ),
+            dailySubmissionLimit=DAILY_SUBMISSION_LIMIT,
+            submissions=[
+                {
+                    "submissionId": int(row["id"]),
+                    "roomCode": normalized,
+                    "participantId": int(participant["id"]),
+                    "participantName": str(participant["display_name"]),
+                    "isBaseline": bool(row["is_baseline"]),
+                    "trainAccuracy": round(float(row["train_accuracy"]), 4),
+                    "validationAccuracy": round(float(row["validation_accuracy"]), 4),
+                    "publicScore": round(float(row["public_score"]), 4),
+                    "privateScore": round(float(row["private_score"]), 4) if has_ended else None,
+                    "submittedAt": str(row["submitted_at"]),
+                    "jobId": str(row["job_id"]),
+                    "optimizer": str(row["optimizer"]),
+                    "batchSize": int(row["batch_size"]),
+                }
+                for row in rows
+            ],
         )
 
 
@@ -676,60 +802,67 @@ def get_competition_leaderboard(
         if room is None:
             raise ValueError("Competition room not found")
 
-        requester_role = "member"
-        if participant_id is not None:
-            requester = connection.execute(
-                """
-                SELECT role
-                FROM competition_participants
-                WHERE id = ? AND room_id = ?
-                """,
-                (participant_id, room["id"]),
-            ).fetchone()
-            if requester is not None:
-                requester_role = str(requester["role"])
+        has_ended = _room_has_ended(room["ends_at"])
+        score_mode = "private" if has_ended else "public"
 
-        rows = connection.execute(
-            """
-            SELECT *
-            FROM (
-                SELECT
-                    p.id AS participant_id,
-                    p.display_name,
-                    p.role,
-                    s.public_score,
-                    s.private_score,
-                    s.train_accuracy,
-                    s.validation_accuracy,
-                    s.optimizer,
-                    s.batch_size,
-                    s.is_baseline,
-                    s.submitted_at,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY p.id
-                        ORDER BY s.private_score DESC, s.public_score DESC, s.submitted_at ASC
-                    ) AS row_number
-                FROM competition_participants p
-                LEFT JOIN competition_submissions s ON s.participant_id = p.id
-                WHERE p.room_id = ?
-            )
-            WHERE row_number = 1 AND public_score IS NOT NULL
-            ORDER BY private_score DESC, public_score DESC, submitted_at ASC
-            """,
-            (room["id"],),
-        ).fetchall()
+        def _fetch_ranked_rows(order_by: str) -> list[sqlite3.Row]:
+            return connection.execute(
+                f"""
+                SELECT *
+                FROM (
+                    SELECT
+                        p.id AS participant_id,
+                        p.display_name,
+                        p.role,
+                        s.public_score,
+                        s.private_score,
+                        s.train_accuracy,
+                        s.validation_accuracy,
+                        s.optimizer,
+                        s.batch_size,
+                        s.is_baseline,
+                        s.submitted_at,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY p.id
+                            ORDER BY {order_by}
+                        ) AS row_number
+                    FROM competition_participants p
+                    LEFT JOIN competition_submissions s ON s.participant_id = p.id
+                    WHERE p.room_id = ?
+                )
+                WHERE row_number = 1 AND public_score IS NOT NULL
+                ORDER BY {order_by}
+                """,
+                (room["id"],),
+            ).fetchall()
+
+        public_rows = _fetch_ranked_rows("public_score DESC, private_score DESC, submitted_at ASC")
+        private_rows = _fetch_ranked_rows("private_score DESC, public_score DESC, submitted_at ASC")
+        public_ranks = {int(row["participant_id"]): index for index, row in enumerate(public_rows, start=1)}
+        private_ranks = {int(row["participant_id"]): index for index, row in enumerate(private_rows, start=1)}
+        rows = private_rows if has_ended else public_rows
 
         entries = []
         for index, row in enumerate(rows, start=1):
+            participant_id_value = int(row["participant_id"])
+            public_rank = public_ranks.get(participant_id_value)
+            private_rank = private_ranks.get(participant_id_value)
+            rank_change = None
+            if has_ended and public_rank is not None and private_rank is not None:
+                rank_change = public_rank - private_rank
+
             entries.append(
                 {
-                    "participantId": int(row["participant_id"]),
+                    "participantId": participant_id_value,
                     "participantName": str(row["display_name"]),
                     "role": str(row["role"]),
                     "rank": index,
+                    "publicRank": public_rank,
+                    "privateRank": private_rank if has_ended else None,
+                    "rankChange": rank_change,
                     "publicScore": round(float(row["public_score"]), 4),
                     "privateScore": round(float(row["private_score"]), 4)
-                    if requester_role == "host"
+                    if has_ended
                     else None,
                     "trainAccuracy": round(float(row["train_accuracy"]), 4),
                     "validationAccuracy": round(float(row["validation_accuracy"]), 4),
@@ -748,5 +881,6 @@ def get_competition_leaderboard(
             startsAt=room["starts_at"],
             endsAt=room["ends_at"],
             isActive=_room_status(room["starts_at"], room["ends_at"]),
+            scoreMode=score_mode,
             entries=entries,
         )

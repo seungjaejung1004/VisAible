@@ -72,10 +72,10 @@ export function MinaBubbleChat({
           <button
             type="button"
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-full bg-white/82 text-[#7b8da9] shadow-[0_8px_18px_rgba(15,23,42,0.06)] transition hover:text-[#10213b]"
+            className="ui-modal-close-button"
             aria-label="Mina 말풍선 닫기"
           >
-            <span className="text-[18px] leading-none">×</span>
+            <span className="text-[26px] leading-none">×</span>
           </button>
         </div>
 

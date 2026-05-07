@@ -5,6 +5,7 @@ from app.schemas.competition import (
     CompetitionEnterRequest,
     CompetitionLeaderboardResponse,
     CompetitionRoomResponse,
+    CompetitionSubmissionHistoryResponse,
     CompetitionSubmissionResponse,
     CompetitionSubmitRequest,
 )
@@ -13,6 +14,7 @@ from app.services.competition import (
     enter_competition_room,
     get_competition_leaderboard,
     get_competition_room,
+    get_competition_submission_history,
     submit_competition_run,
 )
 
@@ -57,6 +59,20 @@ def get_leaderboard(
 ) -> CompetitionLeaderboardResponse:
     try:
         return get_competition_leaderboard(room_code, participant_id=participant_id)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get(
+    "/competition/rooms/{room_code}/submissions",
+    response_model=CompetitionSubmissionHistoryResponse,
+)
+def get_submission_history(
+    room_code: str,
+    participant_id: int = Query(...),
+) -> CompetitionSubmissionHistoryResponse:
+    try:
+        return get_competition_submission_history(room_code, participant_id=participant_id)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 

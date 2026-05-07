@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   augmentationGroups,
@@ -15,6 +15,11 @@ type AugmentationPanelProps = {
   augmentationParams: TrainingAugmentationParams;
   onChangeParam: (id: TrainingAugmentationId, value: number) => void;
 };
+
+const augmentationCatImage = '/augmentation-guides/cat-tabby.png';
+const augmentationDogImage = '/augmentation-guides/dog-golden.png';
+const augmentationCatObjectPosition = 'center 18%';
+const augmentationDogObjectPosition = 'center 22%';
 
 export function AugmentationPanel({
   selectedAugmentations,
@@ -293,10 +298,10 @@ function AugmentationGuideModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-full bg-white text-[#7b8da9] shadow-[0_12px_24px_rgba(13,27,51,0.08)] transition hover:text-[#12213f]"
+          className="ui-modal-close-button absolute right-5 top-5"
           aria-label="설명 닫기"
         >
-          <span className="text-[22px] leading-none">×</span>
+          <span className="text-[26px] leading-none">×</span>
         </button>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_360px] xl:items-start">
@@ -490,36 +495,35 @@ function AugmentationGuideVisual({
   contrastStrength: number;
   grayscaleStrength: number;
 }) {
-  const primaryCatImage = '/augmentation-guides/cat-primary.jpeg';
-  const secondaryCatImage = '/augmentation-guides/cat-secondary.jpeg';
-  const primaryObjectPosition = 'center 18%';
-  const secondaryObjectPosition = 'center 24%';
-
   if (augmentationId === 'mixup') {
     return (
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-3">
-          <GuideImageCard title="Original" imageSrc={primaryCatImage} objectPosition={primaryObjectPosition} />
           <GuideImageCard
-            title="Second Sample"
-            imageSrc={secondaryCatImage}
+            title="Cat Sample"
+            imageSrc={augmentationCatImage}
+            objectPosition={augmentationCatObjectPosition}
+          />
+          <GuideImageCard
+            title="Dog Sample"
+            imageSrc={augmentationDogImage}
             imageStyle={{ filter: 'saturate(1.1) brightness(1.03)' }}
-            objectPosition={secondaryObjectPosition}
+            objectPosition={augmentationDogObjectPosition}
           />
           <GuideImageCard
             title="Mixed Output"
-            imageSrc={primaryCatImage}
+            imageSrc={augmentationCatImage}
             imageStyle={{ filter: 'brightness(1.03) saturate(1.08)' }}
             overlayClassName="bg-[linear-gradient(135deg,rgba(255,255,255,0.04),rgba(87,133,255,0.24))]"
-            secondImageSrc={secondaryCatImage}
+            secondImageSrc={augmentationDogImage}
             secondImageStyle={{ opacity: mixStrength / 100, filter: 'saturate(1.15)' }}
-            objectPosition={primaryObjectPosition}
-            secondObjectPosition={secondaryObjectPosition}
+            objectPosition={augmentationCatObjectPosition}
+            secondObjectPosition={augmentationDogObjectPosition}
           />
         </div>
-      <div className="text-center text-[14px] font-bold text-[#1a6170]">
-        두 고양이 이미지를 부드럽게 섞어 클래스 경계를 매끈하게 만듭니다
-      </div>
+        <div className="text-center text-[14px] font-bold text-[#1a6170]">
+          고양이와 강아지 이미지를 부드럽게 섞어 클래스 경계를 매끈하게 만듭니다
+        </div>
       </div>
     );
   }
@@ -528,46 +532,84 @@ function AugmentationGuideVisual({
     return (
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-2">
-          <GuideImageCard title="Original" imageSrc={primaryCatImage} objectPosition={primaryObjectPosition} />
+          <GuideImageCard
+            title="Cat Sample"
+            imageSrc={augmentationCatImage}
+            objectPosition={augmentationCatObjectPosition}
+          />
           <GuideImageCard
             title="CutMix Result"
-            imageSrc={primaryCatImage}
-            patchImageSrc={secondaryCatImage}
+            imageSrc={augmentationCatImage}
+            patchImageSrc={augmentationDogImage}
             patchImageStyle={{ transform: 'scale(1.08) rotate(6deg)', filter: 'saturate(1.08)' }}
-            objectPosition={primaryObjectPosition}
-            patchObjectPosition={secondaryObjectPosition}
+            objectPosition={augmentationCatObjectPosition}
+            patchObjectPosition={augmentationDogObjectPosition}
             patchFrameStyle={{ width: `${patchScale}%`, height: `${patchScale}%` }}
           />
         </div>
-      <div className="text-center text-[14px] font-semibold text-[#1a6170]">
-        다른 이미지의 일부 패치를 붙여 부분 특징과 전체 맥락을 같이 보게 합니다
-      </div>
+        <div className="text-center text-[14px] font-semibold text-[#1a6170]">
+          강아지 이미지의 일부 패치를 붙여 부분 특징과 전체 맥락을 같이 보게 합니다
+        </div>
       </div>
     );
   }
 
   if (augmentationId === 'flip_rotate') {
     return (
-      <GuideComparePair
-        beforeTitle="Original"
-        afterTitle="Random Horizontal Flip"
-        beforeStyle={{}}
-        afterStyle={{ transform: 'scaleX(-1)' }}
-        helperText={`좌우 반전이 ${flipChance}% 확률로 적용됩니다`}
-      />
+      <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <GuideImageCard
+            title="Original Direction"
+            imageSrc={augmentationCatImage}
+            objectPosition={augmentationCatObjectPosition}
+          >
+            <MirrorGuideOverlay leftLabel="왼쪽" rightLabel="오른쪽" />
+          </GuideImageCard>
+          <GuideImageCard
+            title="Flipped Direction"
+            imageSrc={augmentationCatImage}
+            imageStyle={{ transform: 'scaleX(-1)' }}
+            objectPosition={augmentationCatObjectPosition}
+          >
+            <MirrorGuideOverlay leftLabel="오른쪽" rightLabel="왼쪽" accent />
+          </GuideImageCard>
+        </div>
+        <div className="text-center text-[14px] font-semibold text-[#1a6170]">
+          좌우 위치가 서로 바뀐 같은 이미지가 {flipChance}% 확률로 학습에 들어갑니다
+        </div>
+      </div>
     );
   }
 
   if (augmentationId === 'random_crop') {
+    const cropWindowSize = Math.max(58, Math.min(82, Math.round(10000 / cropZoom)));
+
     return (
-      <GuideComparePair
-        beforeTitle="Original"
-        afterTitle="Random Crop"
-        beforeStyle={{}}
-        afterStyle={{ transform: `scale(${cropZoom / 100}) translate(8px, ${cropOffsetY}px)` }}
-        objectPosition="center 18%"
-        afterObjectPosition="center 10%"
-      />
+      <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <GuideImageCard
+            title="Crop Area"
+            imageSrc={augmentationCatImage}
+            objectPosition={augmentationCatObjectPosition}
+          >
+            <CropGuideOverlay size={cropWindowSize} offsetY={cropOffsetY} />
+          </GuideImageCard>
+          <GuideImageCard
+            title="Cropped Output"
+            imageSrc={augmentationCatImage}
+            imageStyle={{ transform: `scale(${cropZoom / 100}) translate(8px, ${cropOffsetY}px)` }}
+            objectPosition="center 10%"
+          >
+            <div className="absolute inset-3 rounded-[20px] border-2 border-white/85 shadow-[inset_0_0_0_1px_rgba(25,97,112,0.22)]" />
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/92 px-3 py-1 text-[12px] font-bold text-[#1a6170] shadow-[0_8px_18px_rgba(13,27,51,0.14)]">
+              선택 영역 확대
+            </div>
+          </GuideImageCard>
+        </div>
+        <div className="text-center text-[14px] font-semibold text-[#1a6170]">
+          점선 박스 안쪽만 잘라서 {cropZoom}% 크기로 다시 채웁니다
+        </div>
+      </div>
     );
   }
 
@@ -622,15 +664,18 @@ function GuideComparePair({
   afterObjectPosition?: string;
   helperText?: string;
 }) {
-  const catImage = '/augmentation-guides/cat-primary.jpeg';
-
   return (
     <div className="grid gap-4">
       <div className="grid gap-4 md:grid-cols-2">
-        <GuideImageCard title={beforeTitle} imageSrc={catImage} imageStyle={beforeStyle} objectPosition={objectPosition} />
+        <GuideImageCard
+          title={beforeTitle}
+          imageSrc={augmentationCatImage}
+          imageStyle={beforeStyle}
+          objectPosition={objectPosition}
+        />
         <GuideImageCard
           title={afterTitle}
-          imageSrc={catImage}
+          imageSrc={augmentationCatImage}
           imageStyle={afterStyle}
           objectPosition={afterObjectPosition ?? objectPosition}
         />
@@ -653,6 +698,7 @@ function GuideImageCard({
   secondObjectPosition = 'center 18%',
   patchObjectPosition = 'center 18%',
   patchFrameStyle,
+  children,
 }: {
   title: string;
   imageSrc: string;
@@ -666,6 +712,7 @@ function GuideImageCard({
   secondObjectPosition?: string;
   patchObjectPosition?: string;
   patchFrameStyle?: CSSProperties;
+  children?: ReactNode;
 }) {
   return (
     <div className="grid gap-3">
@@ -707,8 +754,60 @@ function GuideImageCard({
             />
           </div>
         ) : null}
+        {children}
       </div>
     </div>
+  );
+}
+
+function MirrorGuideOverlay({
+  leftLabel,
+  rightLabel,
+  accent = false,
+}: {
+  leftLabel: string;
+  rightLabel: string;
+  accent?: boolean;
+}) {
+  const labelClassName = accent
+    ? 'bg-[#fff2f5] text-[#c92f55] ring-[#ffd6df]'
+    : 'bg-white/92 text-[#1a6170] ring-[#cce3e7]';
+
+  return (
+    <>
+      <div className="absolute inset-y-4 left-1/2 w-px -translate-x-1/2 border-l-2 border-dashed border-white/90 shadow-[0_0_0_1px_rgba(25,97,112,0.16)]" />
+      <div className="absolute inset-x-4 top-4 flex items-center justify-between">
+        <span className={`rounded-full px-3 py-1 text-[12px] font-bold shadow-sm ring-1 ${labelClassName}`}>
+          {leftLabel}
+        </span>
+        <span className={`rounded-full px-3 py-1 text-[12px] font-bold shadow-sm ring-1 ${labelClassName}`}>
+          {rightLabel}
+        </span>
+      </div>
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-[#102033]/82 px-3 py-1 text-[12px] font-bold text-white shadow-[0_10px_20px_rgba(13,27,51,0.18)]">
+        좌우 반전
+      </div>
+    </>
+  );
+}
+
+function CropGuideOverlay({ size, offsetY }: { size: number; offsetY: number }) {
+  const verticalOffset = Math.max(-10, Math.min(10, offsetY / 2));
+
+  return (
+    <>
+      <div
+        className="absolute left-1/2 top-1/2 rounded-[22px] border-2 border-dashed border-white bg-white/10 shadow-[0_0_0_999px_rgba(16,32,51,0.32),0_16px_32px_rgba(13,27,51,0.2)]"
+        style={{
+          width: `${size}%`,
+          height: `${Math.max(54, size - 10)}%`,
+          transform: `translate(-50%, calc(-50% + ${verticalOffset}px))`,
+        }}
+      />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white px-3 py-1 text-[12px] font-bold text-[#1a6170] shadow-[0_10px_20px_rgba(13,27,51,0.16)]">
+        자를 영역
+      </div>
+    </>
   );
 }
 
